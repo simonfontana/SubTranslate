@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { extractWordAtOffset } = require("../utils.js");
+const { extractWordAtOffset } = require("../src/utils.js");
 
 describe("extractWordAtOffset", () => {
     it("word in middle of text", () => {

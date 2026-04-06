@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { joinHyphenatedWord } = require("../utils.js");
+const { joinHyphenatedWord } = require("../src/utils.js");
 
 // Helper: build a minimal captionElement stub with the given textContent
 function caption(text) {

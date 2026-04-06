@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { createSubtitleHistory, joinSubtitleParts } = require("../utils.js");
+const { createSubtitleHistory, joinSubtitleParts } = require("../src/utils.js");
 
 describe("createSubtitleHistory", () => {
     it("returns null when empty", () => {

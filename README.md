@@ -27,15 +27,19 @@ You need a DeepL API key (free tier works). Get one at [deepl.com/your-account/k
 
 ### Chrome
 
-1. Go to `chrome://extensions/`
-2. Enable **Developer Mode**
-3. Click **Load unpacked** and select this directory
+1. Run `task build-dirs` to copy files to `out/chrome-build/`
+2. Go to `chrome://extensions/`
+3. Enable **Developer Mode**
+4. Click **Load unpacked** and select `out/chrome-build/`
+5. Re-run `task build-dirs` and reload the extension after source changes
 
 ### Firefox
 
-1. Go to `about:debugging#/runtime/this-firefox`
-2. Click **Load Temporary Add-on**
-3. Select `manifest.json` in this directory
+1. Run `task build-dirs` to copy files to `out/firefox-build/`
+2. Go to `about:debugging#/runtime/this-firefox`
+3. Click **Load Temporary Add-on**
+4. Select `manifest.json` in `out/firefox-build/`
+5. Re-run `task build-dirs` and reload the extension after source changes
 
 ### Configuration
 
@@ -58,48 +62,53 @@ You need a DeepL API key (free tier works). Get one at [deepl.com/your-account/k
 ### Prerequisites
 
 - **Node.js** (v18+) — for running tests
-- **jsdom** — installed as a dev dependency via npm: `npm install`
-- **[task](https://taskfile.dev/installation/)** — task runner used for build/release
-- **jq** — used by `task bump`/`task build` to read the version from `manifest.json`
+- **[task](https://taskfile.dev/installation/)** — task runner used for build/dev/release
+- **jq** — used by the release task to read manifest versions
 - **zip** — used by `task build` to package the extension
 
-### Running Tests
+### Setup
 
 ```
-task test
+npm install
 ```
 
-or directly:
+`npm install` only pulls in `jsdom` for the unit tests — the extension itself has no runtime dependencies.
 
-```
-node --test test/*.test.js
-```
+### Tasks
 
-### Release Process
-
-1. Bump the version: `task bump`
-2. Build the zip: `task build`
-3. The output is written to `out/clicksub-<version>.zip`, ready for browser store submission.
+| Task | Description |
+|------|-------------|
+| `task build-dirs` | Copy extension files to `out/chrome-build/` and `out/firefox-build/` for loading as unpacked extensions. Re-run after source changes. |
+| `task build-zips` | Package the build directories into zip archives for store submission. |
+| `task build` | Run `build-dirs` and `build-zips` (full build). |
+| `task test` | Run unit tests (`node --test test/*.test.js`). |
+| `task release -- <major\|minor\|patch>` | Bump version in both manifests and `package.json`, commit, tag, and push. |
+| `task clean` | Remove the `out/` directory. |
 
 ### Adding a New Site
 
 1. Inspect the live subtitle DOM while a video is playing (the subtitle elements are injected dynamically and won't appear in page source)
 2. Find a stable, semantic CSS selector for the subtitle text element
-3. Add an entry to `SITE_CONFIGS` in `content.js` with `subtitleSelector`, `suppressEvents`, and video control methods
-4. Add the hostname pattern to `content_scripts[0].matches` in `manifest.json`
-5. If the site's subtitle elements have `pointer-events: none`, add a CSS override in `content.css`
+3. Add an entry to `SITE_CONFIGS` in `src/content.js` with `subtitleSelector`, `suppressEvents`, and video control methods
+4. Add the hostname pattern to `content_scripts[0].matches` in both `manifest.firefox.json` and `manifest.chrome.json`
+5. If the site's subtitle elements have `pointer-events: none`, add a CSS override in `src/content.css`
 6. Test: single-click word translation, double-click sentence translation, hyphenated words, overlay handling
 
 ## Project Structure
 
 ```
-manifest.json    - Extension manifest (Manifest V2)
-utils.js         - Shared pure functions (language resolution, highlighting, DOM helpers)
-content.js       - Injected into video pages; handles clicks, highlighting, tooltips
-content.css      - Highlight styles and pointer-events overrides
-background.js    - Receives translation requests, calls DeepL API
-popup.html       - Settings UI (language selection, API key)
-popup.js         - Settings persistence and API key validation
+manifest.firefox.json  - Firefox manifest (MV2)
+manifest.chrome.json   - Chrome manifest (MV3)
+src/
+  utils.js             - Shared pure functions (language resolution, highlighting, DOM helpers)
+  content.js           - Injected into video pages; handles clicks, highlighting, tooltips
+  content.css          - Highlight styles and pointer-events overrides
+  background.js        - Receives translation requests, calls DeepL API
+  popup.html           - Settings UI (language selection, API key)
+  popup.js             - Settings persistence and API key validation
+  icons/               - Extension icons (16, 48, 128px)
+assets/
+  icon512.png          - 512px source icon
 ```
 
 ## AI Assistance

@@ -1,7 +1,7 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
-const { highlightSentenceAcrossSegments } = require("../utils.js");
+const { highlightSentenceAcrossSegments } = require("../src/utils.js");
 
 function makeDoc() {
     return new JSDOM("").window.document;

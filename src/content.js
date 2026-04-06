@@ -1,3 +1,6 @@
+// Firefox exposes a native Promise-based `browser` API; Chrome uses `chrome`.
+const browser = globalThis.browser ?? globalThis.chrome;
+
 // Factory for sites that use a standard <video> element and only differ by subtitle selector.
 function makeVideoSiteConfig(subtitleSelector) {
     return {
@@ -75,14 +78,30 @@ function waitForSubtitleSettle() {
     });
 }
 
+// Cross-browser caret-from-point lookup.
+// Firefox has had `caretPositionFromPoint` for years; Chrome only added it in v128
+// (Aug 2024) and its behavior has been inconsistent. `caretRangeFromPoint` is the
+// older Chrome-native API and is more reliable there. We try the standard API first,
+// fall back to the WebKit/Blink one, and normalize both to { offsetNode, offset }.
+function getCaretPosition(x, y) {
+    if (typeof document.caretPositionFromPoint === "function") {
+        const pos = document.caretPositionFromPoint(x, y);
+        if (pos?.offsetNode) return { offsetNode: pos.offsetNode, offset: pos.offset };
+    }
+    if (typeof document.caretRangeFromPoint === "function") {
+        const range = document.caretRangeFromPoint(x, y);
+        if (range?.startContainer) return { offsetNode: range.startContainer, offset: range.startOffset };
+    }
+    return null;
+}
+
 // Get caret position within a subtitle element, temporarily hiding any overlay elements on top.
-// caretPositionFromPoint returns the text node + character offset at (x,y). If an overlay
-// element (e.g. YouTube's transparent click-capture div) sits above the subtitle, the browser
-// returns the overlay's node instead. We fix this by iterating elementsFromPoint (which returns
-// elements top-to-bottom in stacking order), hiding each one until we reach the subtitle
-// element, then re-querying caretPositionFromPoint so it "sees through" to the subtitle text.
+// If an overlay element (e.g. YouTube's transparent click-capture div) sits above the subtitle,
+// the browser returns the overlay's node instead. We fix this by iterating elementsFromPoint
+// (which returns elements top-to-bottom in stacking order), hiding each one until we reach
+// the subtitle element, then re-querying so the caret API "sees through" to the subtitle text.
 function caretInSubtitle(x, y, subtitleEl) {
-    const direct = document.caretPositionFromPoint(x, y);
+    const direct = getCaretPosition(x, y);
     if (direct?.offsetNode && subtitleEl.contains(direct.offsetNode)) return direct;
     const hidden = [];
     for (const el of document.elementsFromPoint(x, y)) {
@@ -90,7 +109,7 @@ function caretInSubtitle(x, y, subtitleEl) {
         el.style.visibility = "hidden";
         hidden.push(el);
     }
-    const caret = document.caretPositionFromPoint(x, y);
+    const caret = getCaretPosition(x, y);
     for (const el of hidden) el.style.visibility = "";
     return caret;
 }

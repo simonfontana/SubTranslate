@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { getSegmentOffsets } = require("../utils.js");
+const { getSegmentOffsets } = require("../src/utils.js");
 
 function segs(...texts) {
     return texts.map(t => ({ textContent: t }));

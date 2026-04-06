@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { getFullSentenceFromSubtitles } = require("../utils.js");
+const { getFullSentenceFromSubtitles } = require("../src/utils.js");
 
 describe("getFullSentenceFromSubtitles", () => {
     // Single sentence

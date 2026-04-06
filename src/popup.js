@@ -1,3 +1,6 @@
+// Firefox exposes a native Promise-based `browser` API; Chrome uses `chrome`.
+const browser = globalThis.browser ?? globalThis.chrome;
+
 // Popup settings UI — lets the user configure source/target language and DeepL API key.
 // Settings are persisted in browser.storage.local and read by background.js on each
 // translation request.

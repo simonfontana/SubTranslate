@@ -1,3 +1,12 @@
+// Chrome MV3 runs the background as a service worker (no <script> tags), so utils.js
+// must be loaded with importScripts. Firefox loads it via manifest background.scripts.
+if (typeof importScripts !== 'undefined') {
+    importScripts('utils.js');
+}
+
+// Firefox exposes a native Promise-based `browser` API; Chrome uses `chrome`.
+const browser = globalThis.browser ?? globalThis.chrome;
+
 // Message listener for translation requests from content.js.
 // `return true` keeps the message channel open for the async sendResponse call —
 // without it, the port closes before the fetch completes and the content script

@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { buildTranslateParams } = require("../utils.js");
+const { buildTranslateParams } = require("../src/utils.js");
 
 describe("buildTranslateParams", () => {
     it("includes text and target_lang", () => {

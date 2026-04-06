@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { resolveLanguages } = require("../utils.js");
+const { resolveLanguages } = require("../src/utils.js");
 
 describe("resolveLanguages", () => {
     it("forward translation with explicit source and target", () => {

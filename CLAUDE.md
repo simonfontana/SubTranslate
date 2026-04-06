@@ -4,17 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-A Chrome/Firefox WebExtension (Manifest V2) that integrates with YouTube and SVT Play to provide real-time subtitle translation using the DeepL API. No build system — files are loaded directly as an unpacked extension.
+A Chrome/Firefox WebExtension that integrates with YouTube and SVT Play to provide real-time subtitle translation using the DeepL API. No build system — files are loaded directly as an unpacked extension.
 
-## Loading the Extension
+- `manifest.firefox.json` — Firefox (MV2)
+- `manifest.chrome.json` — Chrome (MV3)
+- `src/` — all extension source code (JS, CSS, HTML)
+- `src/icons/` — sized PNGs (16, 48, 128px) for the extension manifests
+- `assets/icon512.png` — 512px source icon (for store listings / generating smaller sizes)
 
-1. Open Chrome → `chrome://extensions/` or Firefox → `about:debugging`
-2. Enable Developer Mode
-3. Click "Load unpacked" and select this directory
+## Loading the Extension for Development
+
+Since the manifests are named `manifest.firefox.json` / `manifest.chrome.json` (not `manifest.json`), use `task build-dirs` to create loadable directories under `out/`:
+
+1. Run `task build-dirs` to copy files to `out/chrome-build/` and `out/firefox-build/`
+2. Open Chrome → `chrome://extensions/` or Firefox → `about:debugging`
+3. Enable Developer Mode
+4. Click "Load unpacked" and select the `out/chrome-build/` or `out/firefox-build/` directory
+5. Re-run `task build-dirs` after changing source files, then reload the extension
 
 ## Architecture
 
-Four components communicate via `browser.runtime.sendMessage` (plus a shared utility module):
+Four components communicate via `browser.runtime.sendMessage` (plus a shared utility module). Each JS file defines `const browser = globalThis.browser ?? globalThis.chrome` so the same code works in both Firefox (native `browser` API) and Chrome (`chrome` API):
 
 **utils.js** — pure functions shared between `background.js` and Node.js tests:
 - `resolveLanguages(settings, reverse, detectedSourceLang)` — resolves source/target language pair for a DeepL request, handling auto-detect and reverse translation
@@ -22,7 +32,7 @@ Four components communicate via `browser.runtime.sendMessage` (plus a shared uti
 **content.js** (injected into supported video pages) — handles all user interaction:
 - Site-specific behaviour is configured in the `SITE_CONFIGS` object at the top of the file; add new sites there
 - Listens for `click` and `dblclick` on subtitle segment elements (selector is per-site)
-- Single click: extracts the clicked word using `document.caretPositionFromPoint()`, highlights it, requests translation
+- Single click: extracts the clicked word using `getCaretPosition()` (a cross-browser wrapper around `caretPositionFromPoint`/`caretRangeFromPoint`), highlights it, requests translation
 - Double click: extracts the full sentence across all visible caption segments, highlights it, requests translation
 - Renders tooltip with translated text; each word in the translation is clickable for reverse translation (translated → source language)
 
@@ -92,14 +102,15 @@ This is necessary because a word/sentence can span multiple text nodes (e.g. in 
 - Uses a standard `<video>` element — pause/play via the HTMLMediaElement API
 - The page source fetched at page-load time does **not** contain subtitle elements; they are injected dynamically into the DOM only while the video is playing with subtitles enabled. To inspect subtitle DOM, run the video with subtitles on and query the live DOM (e.g. `document.querySelectorAll('[class*="cue"]')`).
 - SVT Play is a Next.js app; CSS class names like `css-1okjmlg` are dynamically generated and unstable — always target semantic class names like `.vtt-cue-teletext` instead
-- Each `.vtt-cue-teletext` element contains one `<span>` per subtitle line (e.g. `<span>komplett-</span><span>eringar ...</span>`). `caretPositionFromPoint` returns a text node inside one `<span>`, so the text boundary of a single word may not extend across line breaks. Use `captionElement.textContent` (which concatenates all inner spans) to reason about the full cue text.
-- DOM node references captured at click time (via `caretPositionFromPoint`) may become stale by the time a deferred handler runs (e.g. after the 250ms debounce). Do not rely on node identity (`===`) for nodes captured before a timeout — compare by content or offset instead.
+- Each `.vtt-cue-teletext` element contains one `<span>` per subtitle line (e.g. `<span>komplett-</span><span>eringar ...</span>`). `getCaretPosition` returns a text node inside one `<span>`, so the text boundary of a single word may not extend across line breaks. Use `captionElement.textContent` (which concatenates all inner spans) to reason about the full cue text.
+- DOM node references captured at click time (via `getCaretPosition`) may become stale by the time a deferred handler runs (e.g. after the 250ms debounce). Do not rely on node identity (`===`) for nodes captured before a timeout — compare by content or offset instead.
 
 ## Overlay Handling
 
 `findSubtitleAt()` and `caretInSubtitle()` handle the common case where transparent overlay elements sit on top of subtitle text (YouTube's click-capture div, player control overlays, etc.):
 - `findSubtitleAt()` uses `elementsFromPoint()` to look through the stacking order for a subtitle element
-- `caretInSubtitle()` temporarily hides overlay elements (setting `visibility: hidden`) one by one until `caretPositionFromPoint()` can "see through" to the subtitle text node
+- `caretInSubtitle()` temporarily hides overlay elements (setting `visibility: hidden`) one by one until `getCaretPosition()` can "see through" to the subtitle text node
+- `getCaretPosition()` is a cross-browser wrapper: it prefers the standard `document.caretPositionFromPoint()` (Firefox, Chrome 128+) and falls back to `document.caretRangeFromPoint()` (older Chrome/Blink), normalizing both into `{ offsetNode, offset }`
 
 ## Known Issues / TODOs
 
@@ -107,6 +118,12 @@ This is necessary because a word/sentence can span multiple text nodes (e.g. in 
 - **Translation caching**: Every click fires a DeepL request even for previously translated words. A simple in-memory `Map` cache in `background.js` (with a size cap) would reduce API usage and make repeat lookups instant.
 - **Paid DeepL API support**: `api-free.deepl.com` is hardcoded in `background.js` and `popup.js`. Users with paid plans need `api.deepl.com`. Could auto-detect from key format (free keys end in `:fx`) or add a popup setting.
 - **Error state leaves video paused**: If `handleClick` throws after pausing the video (e.g. extension context lost), the video stays paused with no tooltip and no way to dismiss. A `try/finally` ensuring cleanup on failure would help.
+
+## Setup (fresh clone)
+
+```
+npm install
+```
 
 ## Testing
 
@@ -121,6 +138,6 @@ node --test test/*.test.js
 1. Inspect the live subtitle DOM while a video is playing (page source will not show subtitle elements)
 2. Find a stable, semantic CSS selector for the subtitle text element
 3. If the site uses a standard `<video>` element, call `makeVideoSiteConfig(selector)` and add the result to `SITE_CONFIGS` in `content.js`; otherwise write a custom config object with `subtitleSelector`, `suppressEvents`, and video control methods
-4. Add the hostname pattern to `content_scripts[0].matches` in `manifest.json`
+4. Add the hostname pattern to `content_scripts[0].matches` in both `manifest.firefox.json` and `manifest.chrome.json`
 5. If the site's subtitle elements have `pointer-events: none`, add a CSS override in `content.css`
 6. Test: single-click word translation, double-click sentence translation, hyphenated words, overlay handling

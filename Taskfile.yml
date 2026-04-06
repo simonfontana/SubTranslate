@@ -1,49 +1,70 @@
 version: "3"
 
+interval: 250ms
+
 vars:
   EXT_NAME: clicksub
   VERSION:
-    sh: jq -r .version manifest.json
+    sh: jq -r .version manifest.firefox.json
 
 tasks:
   default:
-    deps: [validate, test, build]
-  build:
-    desc: Build the .zip for Firefox extension submission
-    deps: [validate]
-    cmds:
-      - mkdir -p out
-      - rm -f "out/{{.EXT_NAME}}-{{.VERSION}}.zip"
-      - zip "out/{{.EXT_NAME}}-{{.VERSION}}.zip"
-          manifest.json
-          background.js
-          content.js
-          content.css
-          utils.js
-          popup.html
-          popup.js
-          icon.png
-          LICENSE
-    generates:
-      - "out/{{.EXT_NAME}}-{{.VERSION}}.zip"
+    deps: [test, build]
 
-  validate:
-    desc: Check required files and manifest fields
+  build:
+    desc: Build Firefox and Chrome extension directories and zip archives
+    deps: [build-zips]
+
+  build-dirs:
+    desc: Copy extension files into out/<browser>-build/ directories
+    sources:
+      - src/**/*
+      - manifest.firefox.json
+      - manifest.chrome.json
+      - LICENSE
     cmds:
-      - |
-        ok=true
-        for f in manifest.json background.js content.js content.css utils.js popup.html popup.js icon.png LICENSE; do
-          if [ ! -f "$f" ]; then
-            echo "ERROR: missing $f"
-            ok=false
-          fi
-        done
-        if [ "$ok" = false ]; then exit 1; fi
-        echo "All checks passed"
-    silent: true
+      - for:
+          - firefox
+          - chrome
+        cmd: |
+          build_dir="out/{{.ITEM}}-build"
+          rm -rf "$build_dir"
+          mkdir -p "$build_dir"
+          cp "manifest.{{.ITEM}}.json" "$build_dir/manifest.json"
+          cp -r src "$build_dir/src"
+          cp LICENSE "$build_dir/"
+
+  build-zips:
+    desc: Package out/<browser>-build/ into zip archives
+    deps: [build-dirs]
+    cmds:
+      - for:
+          - firefox
+          - chrome
+        cmd: |
+          zip_name="{{.EXT_NAME}}-{{.VERSION}}-{{.ITEM}}.zip"
+          rm -f "out/$zip_name"
+          cd "out/{{.ITEM}}-build" && zip -r "../$zip_name" .
+
+  install:
+    desc: Install npm dependencies
+    cmds:
+      - npm install
+    sources:
+      - package.json
+      - package-lock.json
+
+  test:
+    desc: Run unit tests
+    sources:
+      - test/**/*
+      - src/**/*
+    cmds:
+      - node --test test/*.test.js
 
   release:
-    desc: "Bump version, commit, tag, and push. Usage: task release [-- minor|major]"
+    deps: [test, build]
+    desc: "Bump version, commit, tag, and push. Usage: task release -- <major|minor|patch>"
     cmds:
       - |
         if [ -n "$(git status --porcelain)" ]; then
@@ -52,7 +73,7 @@ tasks:
         fi
         part="{{.CLI_ARGS}}"
         if [ -z "$part" ]; then echo "ERROR: provide a part (major, minor, or patch)"; exit 1; fi
-        current=$(jq -r .version manifest.json)
+        current=$(jq -r .version manifest.firefox.json)
         IFS='.' read -r major minor patch <<< "$current"
         patch=${patch:-0}
         case "$part" in
@@ -61,21 +82,17 @@ tasks:
           patch) new="$major.$minor.$((patch + 1))" ;;
           *) echo "Unknown part: $part (use major, minor, or patch)"; exit 1 ;;
         esac
-        jq --arg v "$new" '.version = $v' manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+        jq --arg v "$new" '.version = $v' manifest.firefox.json > manifest.tmp && mv manifest.tmp manifest.firefox.json
+        jq --arg v "$new" '.version = $v' manifest.chrome.json > manifest.tmp && mv manifest.tmp manifest.chrome.json
         npm version "$new" --no-git-tag-version
         tag="v$new"
-        git add manifest.json package.json package-lock.json
+        git add manifest.firefox.json manifest.chrome.json package.json package-lock.json
         git commit -m "$tag"
         git tag "$tag"
         git push origin main "$tag"
         echo "Released $current → $new ($tag)"
 
-  test:
-    desc: Run unit tests
-    cmds:
-      - node --test test/*.test.js
-
   clean:
-    desc: Remove built zip files
+    desc: Remove out/ directory (build dirs and zip archives)
     cmds:
       - rm -rf out
