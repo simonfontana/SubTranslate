@@ -50,7 +50,8 @@ tasks:
           echo "ERROR: working tree is dirty — commit your changes first"
           exit 1
         fi
-        part="{{.CLI_ARGS | default "patch"}}"
+        part="{{.CLI_ARGS}}"
+        if [ -z "$part" ]; then echo "ERROR: provide a part (major, minor, or patch)"; exit 1; fi
         current=$(jq -r .version manifest.json)
         IFS='.' read -r major minor patch <<< "$current"
         patch=${patch:-0}
