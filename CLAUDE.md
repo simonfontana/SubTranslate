@@ -34,7 +34,7 @@ Four components communicate via `browser.runtime.sendMessage` (plus a shared uti
 - Listens for `click` and `dblclick` on subtitle segment elements (selector is per-site)
 - Single click: extracts the clicked word using `getCaretPosition()` (a cross-browser wrapper around `caretPositionFromPoint`/`caretRangeFromPoint`), highlights it, requests translation
 - Double click: extracts the full sentence across all visible caption segments, highlights it, requests translation
-- Renders tooltip with translated text; each word in the translation is clickable for reverse translation (translated → source language)
+- Renders tooltip with translated text; clicking the translated word (single-click) or any word in the sentence translation (double-click) shows a reverse translation popup (target → source language)
 
 **background.js** — translation service layer:
 - Listens for `"translate"` messages from content.js
@@ -48,7 +48,6 @@ Four components communicate via `browser.runtime.sendMessage` (plus a shared uti
 
 ## Key Behaviors
 
-- A 250ms debounce on `click` is used to distinguish single-clicks from double-clicks
 - Word boundaries are detected with a Unicode-aware regex `/\p{L}|\d|-/u`
 - `highlightSentenceAcrossSegments()` maps sentence text positions across multiple DOM subtitle segments
 - `cleanup()` is called when the video resumes to remove highlights and close the popup
@@ -57,9 +56,9 @@ Four components communicate via `browser.runtime.sendMessage` (plus a shared uti
 
 ## Staleness & DOM Re-render Handling
 
-Several mechanisms work together to handle the fact that pausing the video (or the 250ms click debounce) can cause the site to re-render subtitle elements, invalidating captured DOM references:
+Several mechanisms work together to handle the fact that pausing the video can cause the site to re-render subtitle elements, invalidating captured DOM references:
 
-- **Caret captured immediately**: `caretInSubtitle()` is called synchronously at click time, before the 250ms timer, because the DOM may change before the deferred handler runs.
+- **Caret captured immediately**: `caretInSubtitle()` is called synchronously at click time, because the DOM may change after the video is paused.
 - **Global text offset**: `getGlobalTextOffset()` converts a (node, charStart) pair into a numeric position in the virtual concatenation of all segments' textContent. This survives DOM re-renders because it's a character position, not a node reference.
 - **`waitForSubtitleSettle()`**: After pausing, waits for the subtitle container's MutationObserver to go quiet (50ms after last mutation, or 150ms timeout if no mutation at all).
 - **Re-query after settle**: After the DOM settles, subtitle elements are re-queried from the DOM and `highlightWordAcrossSegments()` uses the saved global offset to find the correct word occurrence in the new nodes.
@@ -78,9 +77,8 @@ This is necessary because a word/sentence can span multiple text nodes (e.g. in 
 
 ## Tooltip Interaction Flow
 
-1. **Word view** (initial): Shows the translated word in bold. Right-click opens a custom context menu with "Copy" / "Copy original".
-2. **Sentence view** (click the translated word): Translates the full sentence. Each word in the translated sentence is rendered as a clickable `<span>`.
-3. **Reverse translation** (click a word in the sentence view): Shows a small popup above the word with its translation back to the source language (uses `reverse: true` in the message to background.js).
+1. **Word view** (single-click): Shows the translated word in bold. Clicking it shows a reverse translation popup (target → source language). Right-click opens a custom context menu with "Copy" / "Copy original".
+2. **Sentence view** (double-click): Each word in the translated sentence is rendered as a clickable `<span>`. Clicking any word shows a reverse translation popup above it (uses `reverse: true` in the message to background.js).
 
 ## content.css
 
@@ -103,7 +101,7 @@ This is necessary because a word/sentence can span multiple text nodes (e.g. in 
 - The page source fetched at page-load time does **not** contain subtitle elements; they are injected dynamically into the DOM only while the video is playing with subtitles enabled. To inspect subtitle DOM, run the video with subtitles on and query the live DOM (e.g. `document.querySelectorAll('[class*="cue"]')`).
 - SVT Play is a Next.js app; CSS class names like `css-1okjmlg` are dynamically generated and unstable — always target semantic class names like `.vtt-cue-teletext` instead
 - Each `.vtt-cue-teletext` element contains one `<span>` per subtitle line (e.g. `<span>komplett-</span><span>eringar ...</span>`). `getCaretPosition` returns a text node inside one `<span>`, so the text boundary of a single word may not extend across line breaks. Use `captionElement.textContent` (which concatenates all inner spans) to reason about the full cue text.
-- DOM node references captured at click time (via `getCaretPosition`) may become stale by the time a deferred handler runs (e.g. after the 250ms debounce). Do not rely on node identity (`===`) for nodes captured before a timeout — compare by content or offset instead.
+- DOM node references captured at click time (via `getCaretPosition`) may become stale after the video is paused (the site may re-render subtitles). Do not rely on node identity (`===`) for previously captured nodes — compare by content or offset instead.
 
 ## Overlay Handling
 

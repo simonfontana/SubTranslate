@@ -30,8 +30,8 @@ describe("highlightWordAcrossSegments", () => {
         const result = highlightWordAcrossSegments([seg], "world", 6, doc);
 
         assert.notEqual(result, null);
-        assert.equal(result.element, seg);
-        assert.equal(result.wordOffset, 6);
+        assert.equal(result.length, 1);
+        assert.equal(result[0].el, seg);
         const hl = seg.querySelector(".highlight-translate");
         assert.notEqual(hl, null);
         assert.equal(hl.textContent, "world");
@@ -62,7 +62,8 @@ describe("highlightWordAcrossSegments", () => {
         const result = highlightWordAcrossSegments([seg1, seg2], "cat", 16, doc);
 
         assert.notEqual(result, null);
-        assert.equal(result.element, seg2);
+        assert.equal(result.length, 1);
+        assert.equal(result[0].el, seg2);
         assert.equal(seg2.querySelector(".highlight-translate").textContent, "cat");
         // seg1 should not have any highlights
         assert.equal(seg1.querySelector(".highlight-translate"), null);
@@ -120,7 +121,7 @@ describe("highlightWordAcrossSegments", () => {
         assert.notEqual(result, null);
         assert.notEqual(seg.querySelector(".highlight-translate"), null);
 
-        restoreHighlights(result.highlightedSegments);
+        restoreHighlights(result);
 
         assert.equal(seg.textContent, "Hello world foo");
         assert.equal(seg.querySelector(".highlight-translate"), null);

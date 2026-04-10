@@ -237,18 +237,8 @@ async function handleClick(caret, clientX, clientY, captionElement) {
     // After pause + settle, subtitle DOM may be entirely new nodes. Re-query and use
     // the saved globalOffset to find and highlight the correct word occurrence.
     const segments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
-    const highlightResult = highlightWordAcrossSegments(segments, highlightWord, globalOffset, document);
-    if (highlightResult) lastHighlightedSegments = highlightResult.highlightedSegments;
-    const currentElement = highlightResult?.element || captionElement;
-
-    // Determine the full sentence containing the clicked word (for sentence translation on
-    // tooltip click, and as context for the word translation). wordOffset helps disambiguate
-    // when the word appears multiple times.
-    // Use raw textContent (not getAllSubtitleText) so sentence substrings match the DOM text
-    // that highlightSentenceAcrossSegments will search in.
-    const joinedText = segments.map(s => s.textContent).join(" ");
-    const sentenceText = getFullSentenceFromSubtitles(joinedText, clickedWord, highlightResult?.wordOffset)
-        || currentElement.textContent.trim();
+    const highlighted = highlightWordAcrossSegments(segments, highlightWord, globalOffset, document);
+    if (highlighted) lastHighlightedSegments = highlighted;
 
     // Record the hyphen-collapsed form for DeepL context (reads more naturally).
     recordSubtitle(getAllSubtitleText(segments));
@@ -260,8 +250,6 @@ async function handleClick(caret, clientX, clientY, captionElement) {
         x: clientX,
         y: clientY,
         originalText: clickedWord,
-        sentenceText,
-        translationId
     });
 }
 
@@ -299,8 +287,7 @@ async function handleDoubleClick(event, captionElement, caret) {
         x: event.clientX,
         y: event.clientY,
         originalText: sentenceText,
-        sentenceText,
-        translationId
+        isSentence: true,
     });
 }
 
@@ -311,9 +298,8 @@ function cleanup() {
 
 
 // Build and display the translation tooltip.
-// - Initially shows just the translated word (bold, 22px).
-// - Clicking the translated word expands to the full sentence translation, where each
-//   word is individually clickable for reverse translation (target→source language).
+// - Shows the translated word (bold, 22px); clicking it shows its reverse translation.
+// - In sentence mode (double-click), each word is clickable for reverse translation.
 // - Right-clicking the tooltip shows a custom context menu with "Copy" / "Copy original".
 // Creates the tooltip shell (container + translated-word header) and appends it to the
 // document. Returns the tooltip element and the subtitle bounding rect (for positioning).
@@ -437,9 +423,7 @@ function attachContextMenu(tooltip, state) {
 }
 
 // Renders the sentence view: each translated word as a clickable span for reverse translation.
-// Used directly for double-click (sentence already translated) and after expansion for single-click.
-function renderSentenceView({ tooltip, subtitleRect, wordTranslation, state, sentenceText }) {
-    state.currentOriginal = sentenceText;
+function renderSentenceView({ tooltip, subtitleRect, wordTranslation, state }) {
     tooltip.textContent = "";
     const sentenceDiv = document.createElement("div");
     sentenceDiv.id = "translatedSentence";
@@ -492,34 +476,39 @@ function renderSentenceView({ tooltip, subtitleRect, wordTranslation, state, sen
     });
 }
 
-// Wires up sentence-expansion: clicking the translated word fetches the full sentence
-// translation, highlights the sentence in the subtitles, and renders the sentence view.
-function attachSentenceExpansion({ tooltip, subtitleRect, sentenceText, translationId, state }) {
+// Attaches reverse-translation click handler to the translated word element.
+// Clicking the word shows a small popup with it translated back to the source language.
+function attachWordReverseTranslation(tooltip, state) {
     const translatedWordElement = tooltip.querySelector("#translatedWord");
+    Object.assign(translatedWordElement.style, { position: "relative" });
     translatedWordElement.addEventListener("click", async () => {
-        const sentenceResult = await browser.runtime.sendMessage({ action: "translate", text: sentenceText, context: getSubtitleContext() });
-        if (translationId !== currentTranslationId) return;
-        if (sentenceResult.detectedSourceLang) state.detectedSourceLang = sentenceResult.detectedSourceLang;
-        lastHighlightedSegments = restoreHighlights(lastHighlightedSegments);
-        const sentenceSegments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
-        lastHighlightedSegments = highlightSentenceAcrossSegments(sentenceSegments, sentenceText, document);
+        tooltip.querySelectorAll('.reverse-translation').forEach(el => el.remove());
 
-        renderSentenceView({ tooltip, subtitleRect, wordTranslation: sentenceResult.translation, state, sentenceText });
+        const word = translatedWordElement.textContent.trim().replace(/[.,!?;:]/g, '');
+        const reverseResult = await browser.runtime.sendMessage({ action: "translate", text: word, reverse: true, detectedSourceLang: state.detectedSourceLang });
+
+        const popup = document.createElement('div');
+        popup.className = 'reverse-translation';
+        Object.assign(popup.style, {
+            position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.85)', color: '#fff', padding: '2px 6px',
+            borderRadius: '4px', whiteSpace: 'nowrap', fontSize: 'smaller', marginBottom: '4px',
+            zIndex: 10000
+        });
+        translatedWordElement.appendChild(popup);
+        popup.textContent = reverseResult.translation;
     });
 }
 
-// `state.currentOriginal` tracks what "Copy original" should return: starts as the clicked
-// word, switches to sentenceText when the user expands to sentence view.
-function showTooltip({ wordTranslation, detectedSourceLang, x, y, originalText, sentenceText, translationId }) {
+// `state.currentOriginal` tracks what "Copy original" should return.
+function showTooltip({ wordTranslation, detectedSourceLang, x, y, originalText, isSentence }) {
     const state = { currentOriginal: originalText, detectedSourceLang };
     const { tooltip, subtitleRect } = createTooltipShell({ wordTranslation, x, y });
     attachContextMenu(tooltip, state);
 
-    // Double-click already translated the full sentence — go directly to the
-    // clickable-words sentence view instead of the single-word "expand" view.
-    if (originalText === sentenceText) {
-        renderSentenceView({ tooltip, subtitleRect, wordTranslation, state, sentenceText });
+    if (isSentence) {
+        renderSentenceView({ tooltip, subtitleRect, wordTranslation, state });
     } else {
-        attachSentenceExpansion({ tooltip, subtitleRect, sentenceText, translationId, state });
+        attachWordReverseTranslation(tooltip, state);
     }
 }

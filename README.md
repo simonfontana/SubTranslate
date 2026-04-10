@@ -5,9 +5,8 @@ A browser extension that lets you click words in video subtitles to instantly tr
 ## Features
 
 - **Click a word** in the subtitles to translate it. The video pauses and a tooltip shows the translation.
-- **Double-click** to translate the full sentence.
-- **Click the translated word** in the tooltip to expand to a full sentence translation where each word is clickable.
-- **Click any word in the sentence translation** to see its reverse translation (back to the source language).
+- **Double-click** to translate the full sentence, where each word is clickable.
+- **Click any translated word** in the tooltip to see its reverse translation (back to the source language).
 - **Right-click the tooltip** to copy the translation or the original text.
 - Handles hyphenated words split across subtitle lines (e.g. "komplett-" / "eringar" is joined into "kompletteringar" for translation).
 - Supports 29 languages via the DeepL API, with auto-detect for the source language.
@@ -53,9 +52,8 @@ You need a DeepL API key (free tier works). Get one at [deepl.com/your-account/k
 1. Play a video with subtitles enabled
 2. **Single-click** a word in the subtitles to translate it
 3. **Double-click** the subtitles to translate the full sentence
-4. Click the translated word in the tooltip to see the full sentence translation
-5. Click any word in the sentence translation to see its reverse translation
-6. The video resumes when you press play, and the tooltip is automatically dismissed
+4. Click any translated word in the tooltip to see its reverse translation (back to the source language)
+5. The video resumes when you press play, and the tooltip is automatically dismissed
 
 ## Development
 

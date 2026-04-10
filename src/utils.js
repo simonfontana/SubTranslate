@@ -208,7 +208,7 @@ function searchableIndexToRaw(index, insertedSpacePositions) {
 
 // Find and highlight a word across all subtitle segments, using globalOffset to
 // disambiguate when the same word appears multiple times.
-// Returns { element, wordOffset, highlightedSegments } or null if not found.
+// Returns an array of { el, savedNodes } for restoreHighlights(), or null if not found.
 function highlightWordAcrossSegments(segments, clickedWord, globalOffset, doc) {
     const safeWord = clickedWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(`(?<![\\p{L}\\d])${safeWord}(?![\\p{L}\\d])`, "giu");
@@ -236,7 +236,7 @@ function highlightWordAcrossSegments(segments, clickedWord, globalOffset, doc) {
     const savedNodes = Array.from(seg.childNodes).map(n => n.cloneNode(true));
     highlightRangeInSegment(seg, best.index, best.index + best.length, doc);
 
-    return { element: seg, wordOffset: best.absOffset, highlightedSegments: [{ el: seg, savedNodes }] };
+    return [{ el: seg, savedNodes }];
 }
 
 // Highlight an entire sentence across multiple subtitle segments.
