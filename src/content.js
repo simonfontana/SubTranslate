@@ -185,7 +185,7 @@ document.addEventListener("click", (event) => {
     handleClick(caret, event.clientX, event.clientY, clickedElement);
 }, true);
 
-// Double-click on a subtitle: translate the full sentence.
+// Double-click on a subtitle: translate the sentence containing the clicked word.
 // The currentTranslationId bump discards any in-flight single-click translation.
 document.addEventListener("dblclick", (event) => {
     const clickedElement = findSubtitleAt(event);
@@ -194,7 +194,8 @@ document.addEventListener("dblclick", (event) => {
     event.preventDefault();
     event.stopPropagation();
 
-    handleDoubleClick(event, clickedElement);
+    const caret = caretInSubtitle(event.clientX, event.clientY, clickedElement);
+    handleDoubleClick(event, clickedElement, caret);
 }, true);
 
 // Handle a single-click on a subtitle word:
@@ -264,15 +265,16 @@ async function handleClick(caret, clientX, clientY, captionElement) {
     });
 }
 
-async function handleDoubleClick(event, captionElement) {
+async function handleDoubleClick(event, captionElement, caret) {
     const translationId = ++currentTranslationId;
     const allSegments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
     // Use raw textContent so sentence substrings match the DOM for highlighting.
     const joinedText = allSegments.map(s => s.textContent).join(" ");
-    const captionText = captionElement.textContent.trim();
-    // Pass captionText as the "word" — substring search works because captionText
-    // is always a verbatim substring of joinedText.
-    const sentenceText = getFullSentenceFromSubtitles(joinedText, captionText) || captionText;
+    // Extract the clicked word from the caret to find just the sentence it belongs to,
+    // rather than using the full caption element text (which could span multiple sentences).
+    const caretWord = caret?.offsetNode?.textContent ? extractWordAtOffset(caret.offsetNode.textContent, caret.offset) : null;
+    const clickedWord = caretWord?.word || captionElement.textContent.trim();
+    const sentenceText = getFullSentenceFromSubtitles(joinedText, clickedWord) || captionElement.textContent.trim();
     siteConfig.pauseVideo();
     siteConfig.onResume(() => cleanup());
 
