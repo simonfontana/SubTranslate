@@ -38,6 +38,92 @@ const siteConfig = SITE_CONFIGS[window.location.hostname];
 if (!siteConfig) throw new Error(`[clicksub] No config for ${window.location.hostname}`);
 const SUBTITLE_SELECTOR = siteConfig.subtitleSelector;
 
+// SVT Play (Chrome): the browser renders subtitles via native TextTrack / ::cue
+// inside the video element's internal rendering, not as DOM elements we can click.
+// Detect this case and create a custom clickable overlay from the TextTrack cue data.
+if (window.location.hostname === 'www.svtplay.se') {
+    (function initCustomSubtitles() {
+        let overlay = null;
+        let currentTrack = null;
+
+        function renderCues() {
+            if (!overlay || !currentTrack) return;
+            overlay.innerHTML = '';
+            const cues = currentTrack.activeCues;
+            if (!cues) return;
+            for (let i = 0; i < cues.length; i++) {
+                const el = document.createElement('span');
+                el.className = 'vtt-cue-teletext';
+                // Strip VTT formatting tags; split lines into spans
+                // (matches SVT Play's Firefox DOM: one <span> per subtitle line)
+                const text = cues[i].text.replace(/<[^>]*>/g, '');
+                for (const line of text.split('\n')) {
+                    const span = document.createElement('span');
+                    span.textContent = line;
+                    el.appendChild(span);
+                }
+                overlay.appendChild(el);
+            }
+        }
+
+        function setup(video, track) {
+            if (currentTrack === track) return;
+            if (currentTrack) currentTrack.removeEventListener('cuechange', renderCues);
+            currentTrack = track;
+            track.mode = 'hidden'; // keep cues active but hide native rendering
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'clicksub-subtitle-container';
+                video.parentElement.appendChild(overlay);
+            }
+            track.addEventListener('cuechange', renderCues);
+            renderCues();
+        }
+
+        function check() {
+            // Firefox renders custom .vtt-cue-teletext DOM elements — no overlay needed
+            if (document.querySelector('.vtt-cue-teletext:not(.clicksub-subtitle-container .vtt-cue-teletext)')) return true;
+            const video = document.querySelector('video');
+            if (!video) return false;
+            for (let i = 0; i < video.textTracks.length; i++) {
+                if (video.textTracks[i].mode === 'showing') {
+                    setup(video, video.textTracks[i]);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function watchTextTracks(video) {
+            if (video._clicksubTrackWatch) return;
+            video._clicksubTrackWatch = true;
+            video.textTracks.addEventListener('change', () => {
+                if (currentTrack && currentTrack.mode === 'disabled') {
+                    // User turned off subtitles
+                    if (overlay) overlay.innerHTML = '';
+                    currentTrack.removeEventListener('cuechange', renderCues);
+                    currentTrack = null;
+                    return;
+                }
+                // A track was switched to 'showing' — find and set it up
+                for (let i = 0; i < video.textTracks.length; i++) {
+                    if (video.textTracks[i].mode === 'showing') {
+                        setup(video, video.textTracks[i]);
+                        return;
+                    }
+                }
+            });
+        }
+
+        const timer = setInterval(() => {
+            const video = document.querySelector('video');
+            if (!video) return;
+            watchTextTracks(video);
+            if (check()) clearInterval(timer);
+        }, 500);
+    })();
+}
+
 // Monotonically increasing ID used to discard stale translation responses.
 // Each new click/dblclick bumps this; when the async response arrives, it's
 // compared against currentTranslationId — if they differ, the result is outdated.

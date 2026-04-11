@@ -28,3 +28,29 @@
 div:has(.vtt-cue-teletext) {
     pointer-events: auto !important;
 }
+
+/* SVT Play (Chrome): custom subtitle overlay created from native TextTrack data.
+   Positioned at the bottom of the video, styled to match SVT Play's native subtitles. */
+.clicksub-subtitle-container {
+    position: absolute;
+    bottom: 10%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    pointer-events: auto;
+    z-index: 10;
+}
+
+.clicksub-subtitle-container .vtt-cue-teletext {
+    display: inline-block;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 1.4em;
+    padding: 4px 8px;
+    margin: 2px;
+    cursor: default;
+}
+
+.clicksub-subtitle-container .vtt-cue-teletext > span {
+    display: block;
+}
