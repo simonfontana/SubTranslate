@@ -594,7 +594,7 @@ function showReversePopup(tooltip, text) {
     Object.assign(popup.style, {
         position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
         background: 'rgba(0, 0, 0, 0.85)', color: '#fff', padding: REVERSE_POPUP_PADDING,
-        borderRadius: '4px', whiteSpace: 'nowrap', fontSize: REVERSE_POPUP_FONT_SIZE,
+        borderRadius: '4px', whiteSpace: 'nowrap', fontSize: subtitleFontSize + "px",
         zIndex: 10000, marginBottom: REVERSE_POPUP_MARGIN_BOTTOM
     });
     tooltip.appendChild(popup);

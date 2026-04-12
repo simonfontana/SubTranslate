@@ -3,7 +3,6 @@
 // Font sizes
 const DEFAULT_SUBTITLE_FONT_SIZE = 40;
 const CONTEXT_MENU_FONT_SIZE = "14px";
-const REVERSE_POPUP_FONT_SIZE = "16px";
 
 // Tooltip positioning and spacing
 const TOOLTIP_POSITION_OFFSET = 10; // Offset from click coordinates and subtitle spacing
