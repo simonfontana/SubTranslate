@@ -46,6 +46,7 @@ Four components communicate via `browser.runtime.sendMessage` (plus a shared uti
 - All settings auto-save on change (no Save button); language/font size persist immediately, API key is validated against DeepL with an 800ms debounce before saving
 - API key field shows plain text while focused, masked on blur
 - Settings persisted to `browser.storage.local` (`sourceLang`, `targetLang`, `deeplApiKey`)
+- Footer shows DeepL API usage stats (characters used / limit) with a color-coded progress bar (blue → yellow at 75% → red at 90%); fetched from `/v2/usage` on popup open
 
 ## Key Behaviors
 

@@ -10,6 +10,7 @@ A browser extension that lets you click words in video subtitles to instantly tr
 - **Right-click the tooltip** to copy the translation or the original text.
 - Handles hyphenated words split across subtitle lines (e.g. "komplett-" / "eringar" is joined into "kompletteringar" for translation).
 - **Customize subtitle font size** (8–72px) via extension settings for better readability.
+- **API usage tracker** in the popup footer shows characters used vs. limit with a color-coded progress bar.
 - Supports 29 languages via the DeepL API, with auto-detect for the source language.
 
 ## Supported Sites

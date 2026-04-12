@@ -94,6 +94,36 @@ async function validateApiKey(key) {
     }
 }
 
+// Fetch and display DeepL API usage stats
+const usageFooter = document.getElementById("usageFooter");
+
+async function fetchUsage() {
+    const { [STORAGE_KEY_DEEPL_API_KEY]: apiKey } = await browser.storage.local.get(STORAGE_KEY_DEEPL_API_KEY);
+    if (!apiKey) return;
+
+    try {
+        const res = await fetch("https://api-free.deepl.com/v2/usage", {
+            headers: { "Authorization": `DeepL-Auth-Key ${apiKey}` }
+        });
+        const data = await res.json();
+        if (data.character_count != null && data.character_limit != null) {
+            const used = data.character_count.toLocaleString();
+            const total = data.character_limit.toLocaleString();
+            const percent = Math.min(100, (data.character_count / data.character_limit) * 100);
+            const barFill = document.getElementById("usageBarFill");
+            barFill.style.width = `${percent}%`;
+            barFill.style.background = percent >= 90 ? "#d93025" : percent >= 75 ? "#f9ab00" : "#1a73e8";
+            document.getElementById("usageText").textContent = `${used} / ${total} characters`;
+            usageFooter.title = `${percent.toFixed(1)}% used`;
+            usageFooter.style.display = "block";
+        }
+    } catch (err) {
+        console.error("Failed to fetch usage:", err);
+    }
+}
+
+fetchUsage();
+
 // Tab switching
 document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
