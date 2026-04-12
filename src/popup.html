@@ -20,86 +20,124 @@
             width: 100%;
             margin-top: 4px;
         }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ccc;
+            margin-bottom: 10px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 6px 0;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .tab-btn.active {
+            border-bottom-color: #1a73e8;
+            color: #1a73e8;
+            font-weight: bold;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
     </style>
 </head>
 
 <body>
-    <h3>Language Settings</h3>
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="general">General</button>
+        <button class="tab-btn" data-tab="appearance">Appearance</button>
+    </div>
 
-    <label for="sourceLang">Source language:</label>
-    <select id="sourceLang">
-        <option value="auto">Auto-detect</option>
-        <option value="BG">Bulgarian</option>
-        <option value="ZH">Chinese (Simplified)</option>
-        <option value="CS">Czech</option>
-        <option value="DA">Danish</option>
-        <option value="NL">Dutch</option>
-        <option value="EN">English</option>
-        <option value="ET">Estonian</option>
-        <option value="FI">Finnish</option>
-        <option value="FR">French</option>
-        <option value="DE">German</option>
-        <option value="EL">Greek</option>
-        <option value="HU">Hungarian</option>
-        <option value="ID">Indonesian</option>
-        <option value="IT">Italian</option>
-        <option value="JA">Japanese</option>
-        <option value="KO">Korean</option>
-        <option value="LV">Latvian</option>
-        <option value="LT">Lithuanian</option>
-        <option value="NB">Norwegian (Bokmål)</option>
-        <option value="PL">Polish</option>
-        <option value="PT">Portuguese</option>
-        <option value="RO">Romanian</option>
-        <option value="RU">Russian</option>
-        <option value="SK">Slovak</option>
-        <option value="SL">Slovenian</option>
-        <option value="ES">Spanish</option>
-        <option value="SV">Swedish</option>
-        <option value="TR">Turkish</option>
-        <option value="UK">Ukrainian</option>
-    </select>
+    <div id="tab-general" class="tab-panel active">
+        <label for="sourceLang">Source language:</label>
+        <select id="sourceLang">
+            <option value="auto">Auto-detect</option>
+            <option value="BG">Bulgarian</option>
+            <option value="ZH">Chinese (Simplified)</option>
+            <option value="CS">Czech</option>
+            <option value="DA">Danish</option>
+            <option value="NL">Dutch</option>
+            <option value="EN">English</option>
+            <option value="ET">Estonian</option>
+            <option value="FI">Finnish</option>
+            <option value="FR">French</option>
+            <option value="DE">German</option>
+            <option value="EL">Greek</option>
+            <option value="HU">Hungarian</option>
+            <option value="ID">Indonesian</option>
+            <option value="IT">Italian</option>
+            <option value="JA">Japanese</option>
+            <option value="KO">Korean</option>
+            <option value="LV">Latvian</option>
+            <option value="LT">Lithuanian</option>
+            <option value="NB">Norwegian (Bokmål)</option>
+            <option value="PL">Polish</option>
+            <option value="PT">Portuguese</option>
+            <option value="RO">Romanian</option>
+            <option value="RU">Russian</option>
+            <option value="SK">Slovak</option>
+            <option value="SL">Slovenian</option>
+            <option value="ES">Spanish</option>
+            <option value="SV">Swedish</option>
+            <option value="TR">Turkish</option>
+            <option value="UK">Ukrainian</option>
+        </select>
 
-    <label for="targetLang">Target language:</label>
-    <select id="targetLang">
-        <option value="BG">Bulgarian</option>
-        <option value="ZH">Chinese (Simplified)</option>
-        <option value="CS">Czech</option>
-        <option value="DA">Danish</option>
-        <option value="NL">Dutch</option>
-        <option value="EN" selected>English</option>
-        <option value="ET">Estonian</option>
-        <option value="FI">Finnish</option>
-        <option value="FR">French</option>
-        <option value="DE">German</option>
-        <option value="EL">Greek</option>
-        <option value="HU">Hungarian</option>
-        <option value="ID">Indonesian</option>
-        <option value="IT">Italian</option>
-        <option value="JA">Japanese</option>
-        <option value="KO">Korean</option>
-        <option value="LV">Latvian</option>
-        <option value="LT">Lithuanian</option>
-        <option value="NB">Norwegian (Bokmål)</option>
-        <option value="PL">Polish</option>
-        <option value="PT">Portuguese</option>
-        <option value="RO">Romanian</option>
-        <option value="RU">Russian</option>
-        <option value="SK">Slovak</option>
-        <option value="SL">Slovenian</option>
-        <option value="ES">Spanish</option>
-        <option value="SV">Swedish</option>
-        <option value="TR">Turkish</option>
-        <option value="UK">Ukrainian</option>
-    </select>
+        <label for="targetLang">Target language:</label>
+        <select id="targetLang">
+            <option value="BG">Bulgarian</option>
+            <option value="ZH">Chinese (Simplified)</option>
+            <option value="CS">Czech</option>
+            <option value="DA">Danish</option>
+            <option value="NL">Dutch</option>
+            <option value="EN" selected>English</option>
+            <option value="ET">Estonian</option>
+            <option value="FI">Finnish</option>
+            <option value="FR">French</option>
+            <option value="DE">German</option>
+            <option value="EL">Greek</option>
+            <option value="HU">Hungarian</option>
+            <option value="ID">Indonesian</option>
+            <option value="IT">Italian</option>
+            <option value="JA">Japanese</option>
+            <option value="KO">Korean</option>
+            <option value="LV">Latvian</option>
+            <option value="LT">Lithuanian</option>
+            <option value="NB">Norwegian (Bokmål)</option>
+            <option value="PL">Polish</option>
+            <option value="PT">Portuguese</option>
+            <option value="RO">Romanian</option>
+            <option value="RU">Russian</option>
+            <option value="SK">Slovak</option>
+            <option value="SL">Slovenian</option>
+            <option value="ES">Spanish</option>
+            <option value="SV">Swedish</option>
+            <option value="TR">Turkish</option>
+            <option value="UK">Ukrainian</option>
+        </select>
+        <label for="apiKey">DeepL API key:</label>
+        <input type="password" id="apiKey" placeholder="Enter your API key" style="width: 100%;" />
+        <small>You can get one from <a href="https://www.deepl.com/en/your-account/keys" target="_blank">DeepL API
+                Keys</a></small>
+    </div>
 
-    <label for="subtitleFontSize">Subtitle font size (px):</label>
-    <input type="number" id="subtitleFontSize" min="8" max="72" value="30" style="width: 100%;" />
-
-    <label for="apiKey">DeepL API key:</label>
-    <input type="password" id="apiKey" placeholder="Enter your API key" style="width: 100%;" />
-    <small>You can get one from <a href="https://www.deepl.com/en/your-account/keys" target="_blank">DeepL API
-            Keys</a></small>
+    <div id="tab-appearance" class="tab-panel">
+        <label for="subtitleFontSize">Subtitle font size (px):</label>
+        <input type="number" id="subtitleFontSize" min="8" max="72" value="30" style="width: 100%;" />
+    </div>
 
     <button id="saveBtn" style="margin-top: 12px; width: 100%;">Save</button>
     <p id="statusMsg" style="font-size: 12px; color: green; margin-top: 6px;"></p>
