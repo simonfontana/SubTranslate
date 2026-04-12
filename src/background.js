@@ -1,7 +1,7 @@
 // Chrome MV3 runs the background as a service worker (no <script> tags), so utils.js
 // must be loaded with importScripts. Firefox loads it via manifest background.scripts.
 if (typeof importScripts !== 'undefined') {
-    importScripts('utils.js');
+    importScripts('constants.js', 'utils.js');
 }
 
 // Firefox exposes a native Promise-based `browser` API; Chrome uses `chrome`.
@@ -38,9 +38,9 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // DeepL auto-detects it. For reverse translations with auto-detect, `detectedSourceLang`
 // (from a prior forward translation's detected_source_language) is used as target_lang.
 async function translateWithDeepL(text, reverse = false, detectedSourceLang = null, context = null) {
-    const settings = await browser.storage.local.get(["sourceLang", "targetLang", "deeplApiKey"]);
+    const settings = await browser.storage.local.get([STORAGE_KEY_SOURCE_LANG, STORAGE_KEY_TARGET_LANG, STORAGE_KEY_DEEPL_API_KEY]);
 
-    const apiKey = settings.deeplApiKey;
+    const apiKey = settings[STORAGE_KEY_DEEPL_API_KEY];
     if (!apiKey) {
         console.error("[DEBUG] No DeepL API key set");
         return { text: "Please enter your DeepL API key in the extension popup." };
@@ -48,7 +48,7 @@ async function translateWithDeepL(text, reverse = false, detectedSourceLang = nu
 
     const { sourceLang, targetLang } = resolveLanguages(settings, reverse, detectedSourceLang);
 
-    const url = "https://api-free.deepl.com/v2/translate";
+    const url = DEEPL_API_ENDPOINT;
 
     const params = buildTranslateParams(text, { sourceLang, targetLang }, context);
     console.log("[DEBUG] DeepL request params:", params);

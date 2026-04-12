@@ -13,11 +13,11 @@ const saveBtn = document.getElementById("saveBtn");
 const statusMsg = document.getElementById("statusMsg");
 
 // Restore previously saved settings into the form fields
-browser.storage.local.get(["sourceLang", "targetLang", "deeplApiKey", "subtitleFontSize"]).then(data => {
-    if (data.sourceLang) sourceSelect.value = data.sourceLang;
-    if (data.targetLang) targetSelect.value = data.targetLang;
-    if (data.deeplApiKey) apiKeyInput.value = data.deeplApiKey;
-    if (data.subtitleFontSize) subtitleFontSizeInput.value = data.subtitleFontSize;
+browser.storage.local.get([STORAGE_KEY_SOURCE_LANG, STORAGE_KEY_TARGET_LANG, STORAGE_KEY_DEEPL_API_KEY, STORAGE_KEY_SUBTITLE_FONT_SIZE]).then(data => {
+    if (data[STORAGE_KEY_SOURCE_LANG]) sourceSelect.value = data[STORAGE_KEY_SOURCE_LANG];
+    if (data[STORAGE_KEY_TARGET_LANG]) targetSelect.value = data[STORAGE_KEY_TARGET_LANG];
+    if (data[STORAGE_KEY_DEEPL_API_KEY]) apiKeyInput.value = data[STORAGE_KEY_DEEPL_API_KEY];
+    if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) subtitleFontSizeInput.value = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
 });
 
 // Save on button click
@@ -43,10 +43,10 @@ saveBtn.addEventListener("click", async () => {
 
     // Save all settings if key is valid
     await browser.storage.local.set({
-        sourceLang: sourceSelect.value,
-        targetLang: targetSelect.value,
-        deeplApiKey: apiKey,
-        subtitleFontSize: parseInt(subtitleFontSizeInput.value, 10) || 20
+        [STORAGE_KEY_SOURCE_LANG]: sourceSelect.value,
+        [STORAGE_KEY_TARGET_LANG]: targetSelect.value,
+        [STORAGE_KEY_DEEPL_API_KEY]: apiKey,
+        [STORAGE_KEY_SUBTITLE_FONT_SIZE]: parseInt(subtitleFontSizeInput.value, 10) || DEFAULT_SUBTITLE_FONT_SIZE
     });
 
     statusMsg.textContent = "Settings saved!";

@@ -38,13 +38,13 @@ const siteConfig = SITE_CONFIGS[window.location.hostname];
 if (!siteConfig) throw new Error(`[clicksub] No config for ${window.location.hostname}`);
 const SUBTITLE_SELECTOR = siteConfig.subtitleSelector;
 
-let subtitleFontSize = 20;
-browser.storage.local.get("subtitleFontSize").then(data => {
-    if (data.subtitleFontSize) subtitleFontSize = data.subtitleFontSize;
+let subtitleFontSize = DEFAULT_SUBTITLE_FONT_SIZE;
+browser.storage.local.get(STORAGE_KEY_SUBTITLE_FONT_SIZE).then(data => {
+    if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) subtitleFontSize = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
 });
 browser.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.subtitleFontSize) {
-        subtitleFontSize = changes.subtitleFontSize.newValue || 20;
+    if (area === "local" && changes[STORAGE_KEY_SUBTITLE_FONT_SIZE]) {
+        subtitleFontSize = changes[STORAGE_KEY_SUBTITLE_FONT_SIZE].newValue || DEFAULT_SUBTITLE_FONT_SIZE;
     }
 });
 
@@ -85,12 +85,12 @@ if (window.location.hostname === 'www.svtplay.se') {
                 overlay = document.createElement('div');
                 overlay.className = 'clicksub-subtitle-container';
                 video.parentElement.appendChild(overlay);
-                browser.storage.local.get("subtitleFontSize").then(data => {
-                    overlay.style.fontSize = (data.subtitleFontSize || 20) + "px";
+                browser.storage.local.get(STORAGE_KEY_SUBTITLE_FONT_SIZE).then(data => {
+                    overlay.style.fontSize = (data[STORAGE_KEY_SUBTITLE_FONT_SIZE] || DEFAULT_SUBTITLE_FONT_SIZE) + "px";
                 });
                 browser.storage.onChanged.addListener((changes, area) => {
-                    if (area === "local" && changes.subtitleFontSize) {
-                        overlay.style.fontSize = (changes.subtitleFontSize.newValue || 20) + "px";
+                    if (area === "local" && changes[STORAGE_KEY_SUBTITLE_FONT_SIZE]) {
+                        overlay.style.fontSize = (changes[STORAGE_KEY_SUBTITLE_FONT_SIZE].newValue || DEFAULT_SUBTITLE_FONT_SIZE) + "px";
                     }
                 });
             }
@@ -138,7 +138,7 @@ if (window.location.hostname === 'www.svtplay.se') {
             if (!video) return;
             watchTextTracks(video);
             if (check()) clearInterval(timer);
-        }, 500);
+        }, SUBTITLE_POLL_INTERVAL_MS);
     })();
 }
 
@@ -167,15 +167,15 @@ function findSubtitleAt(event) {
 }
 
 // Wait for subtitle DOM to settle after an action (e.g. pause) that may trigger a site re-render.
-// Resolves immediately if no mutation occurs within 150ms, or after the first mutation settles.
+// Resolves immediately if no mutation occurs within SUBTITLE_SETTLE_TIMEOUT_MS, or after the first mutation settles.
 function waitForSubtitleSettle() {
     return new Promise(resolve => {
         const container = document.querySelector(SUBTITLE_SELECTOR)?.parentElement;
         if (!container) { resolve(); return; }
-        let timer = setTimeout(done, 150);
+        let timer = setTimeout(done, SUBTITLE_SETTLE_TIMEOUT_MS);
         const observer = new MutationObserver(() => {
             clearTimeout(timer);
-            timer = setTimeout(done, 50);
+            timer = setTimeout(done, SUBTITLE_SETTLE_DEBOUNCE_MS);
         });
         observer.observe(container, { childList: true, subtree: true, characterData: true });
         function done() { observer.disconnect(); resolve(); }
@@ -268,7 +268,7 @@ setInterval(() => {
         lastSubtitleText = text;
         recordSubtitle(text);
     }
-}, 500);
+}, SUBTITLE_POLL_INTERVAL_MS);
 
 // Single-click on a subtitle word: translate just that word.
 // Fires immediately for a responsive feel. On double-click, the browser fires
@@ -422,10 +422,10 @@ function createTooltipShell({ wordTranslation, x, y }) {
         position: "fixed",
         background: "rgba(0, 0, 0, 0.85)",
         color: "#fff",
-        padding: "10px",
-        borderRadius: "8px",
-        zIndex: 9999,
-        maxWidth: "600px",
+        padding: TOOLTIP_PADDING,
+        borderRadius: TOOLTIP_BORDER_RADIUS,
+        zIndex: TOOLTIP_Z_INDEX,
+        maxWidth: TOOLTIP_MAX_WIDTH,
         transform: "translateX(-50%)",
         textAlign: "center",
         fontFamily: "'YouTube Noto', Roboto, Arial, Helvetica, sans-serif",
@@ -442,10 +442,10 @@ function createTooltipShell({ wordTranslation, x, y }) {
 
     requestAnimationFrame(() => {
         const tooltipRect = tooltip.getBoundingClientRect();
-        let tooltipTop = y + 10;
-        let tooltipLeft = x + 10;
+        let tooltipTop = y + TOOLTIP_POSITION_OFFSET;
+        let tooltipLeft = x + TOOLTIP_POSITION_OFFSET;
         if (subtitleRect) {
-            tooltipTop = subtitleRect.top - tooltipRect.height - 10;
+            tooltipTop = subtitleRect.top - tooltipRect.height - TOOLTIP_POSITION_OFFSET;
             tooltipLeft = subtitleRect.left + subtitleRect.width / 2;
         }
         tooltip.style.top = `${tooltipTop}px`;
@@ -473,13 +473,13 @@ function attachContextMenu(tooltip, state) {
             position: "fixed",
             background: "rgba(30, 30, 30, 0.97)",
             color: "#fff",
-            borderRadius: "6px",
-            padding: "4px 0",
-            zIndex: 10001,
-            minWidth: "120px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+            borderRadius: CONTEXT_MENU_BORDER_RADIUS,
+            padding: CONTEXT_MENU_PADDING,
+            zIndex: CONTEXT_MENU_Z_INDEX,
+            minWidth: CONTEXT_MENU_MIN_WIDTH,
+            boxShadow: CONTEXT_MENU_BOX_SHADOW,
             fontFamily: "'YouTube Noto', Roboto, Arial, Helvetica, sans-serif",
-            fontSize: "14px",
+            fontSize: CONTEXT_MENU_FONT_SIZE,
         });
         // Initially off-screen; repositioned in rAF once dimensions are known
         menu.style.top = "-9999px";
@@ -495,7 +495,7 @@ function attachContextMenu(tooltip, state) {
 
         const copyItem = document.createElement("div");
         copyItem.textContent = "Copy";
-        Object.assign(copyItem.style, { padding: "6px 16px", cursor: "pointer" });
+        Object.assign(copyItem.style, { padding: CONTEXT_MENU_ITEM_PADDING, cursor: "pointer" });
         copyItem.addEventListener("mouseenter", () => { copyItem.style.background = "rgba(255,255,255,0.15)"; });
         copyItem.addEventListener("mouseleave", () => { copyItem.style.background = ""; });
         copyItem.addEventListener("click", () => {
@@ -505,7 +505,7 @@ function attachContextMenu(tooltip, state) {
 
         const copyOriginalItem = document.createElement("div");
         copyOriginalItem.textContent = "Copy original";
-        Object.assign(copyOriginalItem.style, { padding: "6px 16px", cursor: "pointer" });
+        Object.assign(copyOriginalItem.style, { padding: CONTEXT_MENU_ITEM_PADDING, cursor: "pointer" });
         copyOriginalItem.addEventListener("mouseenter", () => { copyOriginalItem.style.background = "rgba(255,255,255,0.15)"; });
         copyOriginalItem.addEventListener("mouseleave", () => { copyOriginalItem.style.background = ""; });
         copyOriginalItem.addEventListener("click", () => {
@@ -531,7 +531,7 @@ function renderSentenceView({ tooltip, subtitleRect, wordTranslation, state }) {
     tooltip.textContent = "";
     const sentenceDiv = document.createElement("div");
     sentenceDiv.id = "translatedSentence";
-    Object.assign(sentenceDiv.style, { fontSize: subtitleFontSize + "px", lineHeight: "1.4" });
+    Object.assign(sentenceDiv.style, { fontSize: subtitleFontSize + "px", lineHeight: SENTENCE_VIEW_LINE_HEIGHT });
     tooltip.appendChild(sentenceDiv);
 
     // Render each translated word as a clickable span for reverse-translation lookup
@@ -581,9 +581,9 @@ function showReversePopup(tooltip, text) {
     popup.className = 'reverse-translation';
     Object.assign(popup.style, {
         position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(0, 0, 0, 0.85)', color: '#fff', padding: '4px 8px',
-        borderRadius: '4px', whiteSpace: 'nowrap', fontSize: '16px',
-        zIndex: 10000, marginBottom: '6px'
+        background: 'rgba(0, 0, 0, 0.85)', color: '#fff', padding: REVERSE_POPUP_PADDING,
+        borderRadius: '4px', whiteSpace: 'nowrap', fontSize: REVERSE_POPUP_FONT_SIZE,
+        zIndex: 10000, marginBottom: REVERSE_POPUP_MARGIN_BOTTOM
     });
     tooltip.appendChild(popup);
     popup.textContent = text;

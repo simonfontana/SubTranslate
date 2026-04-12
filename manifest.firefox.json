@@ -15,6 +15,7 @@
   },
   "background": {
     "scripts": [
+      "src/constants.js",
       "src/utils.js",
       "src/background.js"
     ],
@@ -27,6 +28,7 @@
         "*://www.svtplay.se/*"
       ],
       "js": [
+        "src/constants.js",
         "src/utils.js",
         "src/content.js"
       ],

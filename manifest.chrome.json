@@ -25,6 +25,7 @@
         "*://www.svtplay.se/*"
       ],
       "js": [
+        "src/constants.js",
         "src/utils.js",
         "src/content.js"
       ],
