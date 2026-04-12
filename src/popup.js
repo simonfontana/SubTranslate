@@ -9,7 +9,6 @@ const sourceSelect = document.getElementById("sourceLang");
 const targetSelect = document.getElementById("targetLang");
 const apiKeyInput = document.getElementById("apiKey");
 const subtitleFontSizeInput = document.getElementById("subtitleFontSize");
-const saveBtn = document.getElementById("saveBtn");
 const statusMsg = document.getElementById("statusMsg");
 
 // Restore previously saved settings into the form fields
@@ -20,40 +19,51 @@ browser.storage.local.get([STORAGE_KEY_SOURCE_LANG, STORAGE_KEY_TARGET_LANG, STO
     if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) subtitleFontSizeInput.value = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
 });
 
-// Save on button click
-saveBtn.addEventListener("click", async () => {
-    const apiKey = apiKeyInput.value.trim();
+// Auto-save language and font size settings immediately on change
+sourceSelect.addEventListener("change", () => {
+    browser.storage.local.set({ [STORAGE_KEY_SOURCE_LANG]: sourceSelect.value });
+});
 
-    if (!apiKey) {
-        statusMsg.textContent = "Please enter your API key.";
-        statusMsg.style.color = "red";
+targetSelect.addEventListener("change", () => {
+    browser.storage.local.set({ [STORAGE_KEY_TARGET_LANG]: targetSelect.value });
+});
+
+subtitleFontSizeInput.addEventListener("change", () => {
+    browser.storage.local.set({
+        [STORAGE_KEY_SUBTITLE_FONT_SIZE]: parseInt(subtitleFontSizeInput.value, 10) || DEFAULT_SUBTITLE_FONT_SIZE
+    });
+});
+
+// Show API key as plain text while focused, masked otherwise
+apiKeyInput.addEventListener("focus", () => { apiKeyInput.type = "text"; });
+apiKeyInput.addEventListener("blur", () => { apiKeyInput.type = "password"; });
+
+// Validate and save API key with debounce after user stops typing
+let apiKeyDebounceTimer = null;
+apiKeyInput.addEventListener("input", () => {
+    clearTimeout(apiKeyDebounceTimer);
+    const key = apiKeyInput.value.trim();
+
+    if (!key) {
+        statusMsg.textContent = "";
         return;
     }
 
     statusMsg.textContent = "Validating API key...";
     statusMsg.style.color = "black";
 
-    console.log("Validating key");
-    const valid = await validateApiKey(apiKey);
-    if (!valid) {
-        statusMsg.textContent = "Invalid API key.";
-        statusMsg.style.color = "red";
-        return;
-    }
-
-    // Save all settings if key is valid
-    await browser.storage.local.set({
-        [STORAGE_KEY_SOURCE_LANG]: sourceSelect.value,
-        [STORAGE_KEY_TARGET_LANG]: targetSelect.value,
-        [STORAGE_KEY_DEEPL_API_KEY]: apiKey,
-        [STORAGE_KEY_SUBTITLE_FONT_SIZE]: parseInt(subtitleFontSizeInput.value, 10) || DEFAULT_SUBTITLE_FONT_SIZE
-    });
-
-    statusMsg.textContent = "Settings saved!";
-    statusMsg.style.color = "green";
-    setTimeout(() => {
-        statusMsg.textContent = "";
-    }, 2000);
+    apiKeyDebounceTimer = setTimeout(async () => {
+        const valid = await validateApiKey(key);
+        if (!valid) {
+            statusMsg.textContent = "Invalid API key.";
+            statusMsg.style.color = "red";
+            return;
+        }
+        await browser.storage.local.set({ [STORAGE_KEY_DEEPL_API_KEY]: key });
+        statusMsg.textContent = "API key saved.";
+        statusMsg.style.color = "green";
+        setTimeout(() => { statusMsg.textContent = ""; }, 2000);
+    }, 800);
 });
 
 // Validate the API key by making a real translation request to DeepL.
@@ -94,9 +104,4 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     });
 });
 
-// Close button
-const closeBtn = document.getElementById("closeBtn");
-closeBtn.addEventListener("click", () => {
-    window.close();
-});
 

@@ -43,8 +43,9 @@ Four components communicate via `browser.runtime.sendMessage` (plus a shared uti
 
 **popup.html + popup.js** — settings UI:
 - User configures source/target language and DeepL API key
+- All settings auto-save on change (no Save button); language/font size persist immediately, API key is validated against DeepL with an 800ms debounce before saving
+- API key field shows plain text while focused, masked on blur
 - Settings persisted to `browser.storage.local` (`sourceLang`, `targetLang`, `deeplApiKey`)
-- Validates the API key with a test request to DeepL
 
 ## Key Behaviors
 

@@ -44,10 +44,9 @@ You need a DeepL API key (free tier works). Get one at [deepl.com/your-account/k
 ### Configuration
 
 1. Click the extension icon in the toolbar
-2. Select your source and target languages
-3. Enter your DeepL API key
-4. Click **Save**
-5. Optionally, adjust the subtitle font size (8–72px) under the **Appearance** tab
+2. Select your source and target languages (saved automatically)
+3. Enter your DeepL API key (validated and saved automatically)
+4. Optionally, adjust the subtitle font size (8–72px) under the **Appearance** tab
 
 ## Usage
 
