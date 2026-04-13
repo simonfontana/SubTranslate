@@ -1,6 +1,6 @@
 {
   "name": "subtranslate",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "A browser extension that lets you click words in video subtitles to instantly translate them using the DeepL API. Works on YouTube and SVT Play.",
   "main": "background.js",
   "directories": {
