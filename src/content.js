@@ -304,10 +304,31 @@ document.addEventListener("click", (event) => {
     handleClick(caret, event.clientX, event.clientY, clickedElement);
 }, true);
 
-// Right-click on a subtitle: show a context menu with "Copy" (the right-clicked word)
-// and "Copy sentence" (the sentence containing that word). Does not pause the video;
-// the word and sentence are captured synchronously so the copy still works even if
-// the subtitle changes before the user picks a menu item.
+// Maps DeepL source-language codes to the English language name used as a
+// section heading on en.wiktionary.org (e.g. "SV" -> "Swedish", which becomes
+// the "#Swedish" anchor in https://en.wiktionary.org/wiki/god#Swedish).
+const DEEPL_TO_WIKTIONARY_LANG = {
+    BG: "Bulgarian", ZH: "Chinese", CS: "Czech", DA: "Danish", NL: "Dutch",
+    EN: "English", ET: "Estonian", FI: "Finnish", FR: "French", DE: "German",
+    EL: "Greek", HU: "Hungarian", ID: "Indonesian", IT: "Italian", JA: "Japanese",
+    KO: "Korean", LV: "Latvian", LT: "Lithuanian", NB: "Norwegian Bokmål",
+    PL: "Polish", PT: "Portuguese", RO: "Romanian", RU: "Russian", SK: "Slovak",
+    SL: "Slovene", ES: "Spanish", SV: "Swedish", TR: "Turkish", UK: "Ukrainian",
+};
+
+function openWiktionary(word) {
+    browser.storage.local.get(STORAGE_KEY_SOURCE_LANG).then(data => {
+        const langName = DEEPL_TO_WIKTIONARY_LANG[data[STORAGE_KEY_SOURCE_LANG]];
+        const hash = langName ? `#${encodeURIComponent(langName.replace(/ /g, "_"))}` : "";
+        window.open(`https://en.wiktionary.org/wiki/${encodeURIComponent(word)}${hash}`, "_blank");
+    });
+}
+
+// Right-click on a subtitle: show a context menu with "Copy" (the right-clicked word),
+// "Copy sentence" (the sentence containing that word), and "Look up on Wiktionary"
+// (opens the Wiktionary entry for the word, jumping to the source-language section).
+// Does not pause the video; the word and sentence are captured synchronously so the
+// copy still works even if the subtitle changes before the user picks a menu item.
 document.addEventListener("contextmenu", (event) => {
     const subtitleElement = findSubtitleAt(event);
     if (!subtitleElement) return;
@@ -329,6 +350,7 @@ document.addEventListener("contextmenu", (event) => {
     showContextMenu(event.clientX, event.clientY, [
         { label: "Copy", onSelect: () => navigator.clipboard.writeText(word) },
         { label: "Copy sentence", onSelect: () => navigator.clipboard.writeText(sentence) },
+        { label: "Look up on Wiktionary", onSelect: () => openWiktionary(word) },
     ]);
 }, true);
 
