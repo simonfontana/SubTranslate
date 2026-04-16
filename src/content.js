@@ -183,7 +183,36 @@ let currentTranslationId = 0;
 let lastTooltip = null;
 
 // Ring buffer for subtitle history — used to build DeepL translation context.
-const { record: recordSubtitle, getContext: getSubtitleContext } = createSubtitleHistory(5);
+// Recreated when the user changes the history size (losing any already-captured history,
+// which is acceptable — translation context is ephemeral by nature).
+let subtitleHistory = createSubtitleHistory(DEFAULT_CONTEXT_HISTORY_SIZE);
+const recordSubtitle = (text) => subtitleHistory.record(text);
+const getSubtitleContext = () => subtitleHistory.getContext();
+
+browser.storage.local.get(STORAGE_KEY_CONTEXT_HISTORY_SIZE).then(data => {
+    const size = data[STORAGE_KEY_CONTEXT_HISTORY_SIZE];
+    if (typeof size === "number") subtitleHistory = createSubtitleHistory(size);
+});
+browser.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes[STORAGE_KEY_CONTEXT_HISTORY_SIZE]) {
+        const size = changes[STORAGE_KEY_CONTEXT_HISTORY_SIZE].newValue;
+        subtitleHistory = createSubtitleHistory(typeof size === "number" ? size : DEFAULT_CONTEXT_HISTORY_SIZE);
+    }
+});
+
+// Pause-on-translate toggle: cached locally so click handlers can read it synchronously.
+let pauseOnTranslate = DEFAULT_PAUSE_ON_TRANSLATE;
+browser.storage.local.get(STORAGE_KEY_PAUSE_ON_TRANSLATE).then(data => {
+    if (typeof data[STORAGE_KEY_PAUSE_ON_TRANSLATE] === "boolean") {
+        pauseOnTranslate = data[STORAGE_KEY_PAUSE_ON_TRANSLATE];
+    }
+});
+browser.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes[STORAGE_KEY_PAUSE_ON_TRANSLATE]) {
+        const v = changes[STORAGE_KEY_PAUSE_ON_TRANSLATE].newValue;
+        pauseOnTranslate = typeof v === "boolean" ? v : DEFAULT_PAUSE_ON_TRANSLATE;
+    }
+});
 // Stores { el, savedNodes } for each segment that was modified by highlighting,
 // so restoreHighlights() can put the original DOM back.
 let lastHighlightedSegments = [];
@@ -417,16 +446,21 @@ async function handleClick(caret, clientX, clientY, captionElement) {
     const preSegments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
     const globalOffset = getGlobalTextOffset(preSegments, captionElement, caret.offsetNode, start, document);
 
-    siteConfig.pauseVideo();
-    siteConfig.onResume(() => cleanup());
+    if (pauseOnTranslate) {
+        siteConfig.pauseVideo();
+        siteConfig.onResume(() => cleanup());
+    }
 
     cleanup();
 
-    await waitForSubtitleSettle();
-    if (translationId !== currentTranslationId) return;
+    if (pauseOnTranslate) {
+        await waitForSubtitleSettle();
+        if (translationId !== currentTranslationId) return;
+    }
 
     // After pause + settle, subtitle DOM may be entirely new nodes. Re-query and use
     // the saved globalOffset to find and highlight the correct word occurrence.
+    // (When not pausing, we're using the original nodes, but re-querying is still safe.)
     const segments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
     const highlighted = highlightWordAcrossSegments(segments, highlightWord, globalOffset, document);
     if (highlighted) lastHighlightedSegments = highlighted;
@@ -450,13 +484,17 @@ async function handleDoubleClick(event, captionElement, caret) {
     const caretWord = caret?.offsetNode?.textContent ? extractWordAtOffset(caret.offsetNode.textContent, caret.offset) : null;
     const clickedWord = caretWord?.word || captionElement.textContent.trim();
 
-    siteConfig.pauseVideo();
-    siteConfig.onResume(() => cleanup());
+    if (pauseOnTranslate) {
+        siteConfig.pauseVideo();
+        siteConfig.onResume(() => cleanup());
+    }
 
     cleanup();
 
-    await waitForSubtitleSettle();
-    if (translationId !== currentTranslationId) return;
+    if (pauseOnTranslate) {
+        await waitForSubtitleSettle();
+        if (translationId !== currentTranslationId) return;
+    }
 
     // After pause + settle, subtitle DOM may be entirely new nodes. Re-query.
     const allSegments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));

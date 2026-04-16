@@ -42,10 +42,11 @@ Four components communicate via `browser.runtime.sendMessage` (plus a shared uti
 - POSTs to the DeepL translate endpoint (`api-free.deepl.com` or `api.deepl.com`, auto-detected from the API key); supports a `reverse` flag that swaps source/target languages
 
 **popup.html + popup.js** — settings UI:
-- User configures source/target language and DeepL API key
-- All settings auto-save on change (no Save button); language/font size persist immediately, API key is validated against DeepL with an 800ms debounce before saving
+- Three tabs: **General** (source/target language, DeepL API key), **Appearance** (subtitle font size, highlight color), **Advanced** (context history size, translation model, pause-on-translate toggle, reset-to-defaults button)
+- All settings auto-save on change (no Save button); most persist immediately, API key is validated against DeepL with an 800ms debounce before saving
 - API key field shows plain text while focused, masked on blur
-- Settings persisted to `browser.storage.local` (`sourceLang`, `targetLang`, `deeplApiKey`)
+- Settings persisted to `browser.storage.local`; all storage keys and defaults live in `src/constants.js` (`STORAGE_KEY_*` / `DEFAULT_*`) — read from there rather than hardcoding key names
+- Reset-to-defaults button on the Advanced tab clears only the advanced settings; language, API key, and appearance are intentionally preserved
 - Footer shows DeepL API usage stats (characters used / limit) with a color-coded progress bar (blue → yellow at 75% → red at 90%); fetched from `/v2/usage` on popup open
 
 ## Key Behaviors
@@ -115,7 +116,6 @@ This is necessary because a word/sentence can span multiple text nodes (e.g. in 
 ## Known Issues / TODOs
 
 ### Features to consider
-- **Translation caching**: Every click fires a DeepL request even for previously translated words. A simple in-memory `Map` cache in `background.js` (with a size cap) would reduce API usage and make repeat lookups instant.
 - **Error state leaves video paused**: If `handleClick` throws after pausing the video (e.g. extension context lost), the video stays paused with no tooltip and no way to dismiss. A `try/finally` ensuring cleanup on failure would help.
 
 ## Setup (fresh clone)

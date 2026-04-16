@@ -297,7 +297,10 @@ function restoreHighlights(highlightedSegments) {
 // resolvedLangs: { sourceLang, targetLang } as returned by resolveLanguages().
 // sourceLang may be null (auto-detect) — in that case source_lang is omitted.
 // context (optional): surrounding sentence text sent as DeepL context for better word translation.
-function buildTranslateParams(text, resolvedLangs, context = null) {
+// options (optional): { modelType } — "latency_optimized" is omitted (API default);
+//   "prefer_quality_optimized" is passed through and DeepL falls back automatically
+//   on unsupported language pairs.
+function buildTranslateParams(text, resolvedLangs, context = null, options = {}) {
     // text is wrapped in an array — DeepL's JSON API requires text as an array of strings.
     const params = { text: [text], target_lang: resolvedLangs.targetLang };
     if (resolvedLangs.sourceLang !== null) {
@@ -305,6 +308,9 @@ function buildTranslateParams(text, resolvedLangs, context = null) {
     }
     if (context) {
         params.context = context;
+    }
+    if (options.modelType && options.modelType !== "latency_optimized") {
+        params.model_type = options.modelType;
     }
     return params;
 }
@@ -314,6 +320,7 @@ function buildTranslateParams(text, resolvedLangs, context = null) {
 // - record(text): appends text; consecutive duplicates are ignored; O(1)
 // - getContext(): returns all entries joined in chronological order, or null if empty; O(size)
 function createSubtitleHistory(size) {
+    if (size <= 0) return { record: () => {}, getContext: () => null };
     const buffer = new Array(size).fill(null);
     let counter = 0;
 

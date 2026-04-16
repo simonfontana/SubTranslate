@@ -14,6 +14,10 @@ const customColorPreview = document.getElementById("customColorPreview");
 const hueSlider = document.getElementById("hueSlider");
 const satSlider = document.getElementById("satSlider");
 const lightSlider = document.getElementById("lightSlider");
+const contextHistorySizeInput = document.getElementById("contextHistorySize");
+const deeplModelTypeSelect = document.getElementById("deeplModelType");
+const pauseOnTranslateCheckbox = document.getElementById("pauseOnTranslate");
+const resetAdvancedBtn = document.getElementById("resetAdvanced");
 const statusMsg = document.getElementById("statusMsg");
 
 function hslToHex(h, s, l) {
@@ -82,12 +86,32 @@ function commitColor(color, syncSliders = true) {
 }
 
 // Restore previously saved settings into the form fields
-browser.storage.local.get([STORAGE_KEY_SOURCE_LANG, STORAGE_KEY_TARGET_LANG, STORAGE_KEY_DEEPL_API_KEY, STORAGE_KEY_SUBTITLE_FONT_SIZE, STORAGE_KEY_HIGHLIGHT_COLOR]).then(data => {
+function applyAdvancedSettings(data) {
+    contextHistorySizeInput.value = typeof data[STORAGE_KEY_CONTEXT_HISTORY_SIZE] === "number"
+        ? data[STORAGE_KEY_CONTEXT_HISTORY_SIZE]
+        : DEFAULT_CONTEXT_HISTORY_SIZE;
+    deeplModelTypeSelect.value = data[STORAGE_KEY_DEEPL_MODEL_TYPE] || DEFAULT_DEEPL_MODEL_TYPE;
+    pauseOnTranslateCheckbox.checked = typeof data[STORAGE_KEY_PAUSE_ON_TRANSLATE] === "boolean"
+        ? data[STORAGE_KEY_PAUSE_ON_TRANSLATE]
+        : DEFAULT_PAUSE_ON_TRANSLATE;
+}
+
+browser.storage.local.get([
+    STORAGE_KEY_SOURCE_LANG,
+    STORAGE_KEY_TARGET_LANG,
+    STORAGE_KEY_DEEPL_API_KEY,
+    STORAGE_KEY_SUBTITLE_FONT_SIZE,
+    STORAGE_KEY_HIGHLIGHT_COLOR,
+    STORAGE_KEY_CONTEXT_HISTORY_SIZE,
+    STORAGE_KEY_DEEPL_MODEL_TYPE,
+    STORAGE_KEY_PAUSE_ON_TRANSLATE,
+]).then(data => {
     if (data[STORAGE_KEY_SOURCE_LANG]) sourceSelect.value = data[STORAGE_KEY_SOURCE_LANG];
     if (data[STORAGE_KEY_TARGET_LANG]) targetSelect.value = data[STORAGE_KEY_TARGET_LANG];
     if (data[STORAGE_KEY_DEEPL_API_KEY]) apiKeyInput.value = data[STORAGE_KEY_DEEPL_API_KEY];
     if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) subtitleFontSizeInput.value = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
     renderColor(data[STORAGE_KEY_HIGHLIGHT_COLOR] || DEFAULT_HIGHLIGHT_COLOR);
+    applyAdvancedSettings(data);
 });
 
 // Auto-save language and font size settings immediately on change
@@ -103,6 +127,33 @@ subtitleFontSizeInput.addEventListener("change", () => {
     browser.storage.local.set({
         [STORAGE_KEY_SUBTITLE_FONT_SIZE]: parseInt(subtitleFontSizeInput.value, 10) || DEFAULT_SUBTITLE_FONT_SIZE
     });
+});
+
+contextHistorySizeInput.addEventListener("change", () => {
+    const raw = parseInt(contextHistorySizeInput.value, 10);
+    const clamped = Math.max(0, Math.min(10, Number.isFinite(raw) ? raw : DEFAULT_CONTEXT_HISTORY_SIZE));
+    contextHistorySizeInput.value = clamped;
+    browser.storage.local.set({ [STORAGE_KEY_CONTEXT_HISTORY_SIZE]: clamped });
+});
+
+deeplModelTypeSelect.addEventListener("change", () => {
+    browser.storage.local.set({ [STORAGE_KEY_DEEPL_MODEL_TYPE]: deeplModelTypeSelect.value });
+});
+
+pauseOnTranslateCheckbox.addEventListener("change", () => {
+    browser.storage.local.set({ [STORAGE_KEY_PAUSE_ON_TRANSLATE]: pauseOnTranslateCheckbox.checked });
+});
+
+// Reset the Advanced tab to defaults. Other tabs (language, API key, appearance)
+// are left alone — resetting the API key would be a user-hostile surprise.
+resetAdvancedBtn.addEventListener("click", () => {
+    const defaults = {
+        [STORAGE_KEY_CONTEXT_HISTORY_SIZE]: DEFAULT_CONTEXT_HISTORY_SIZE,
+        [STORAGE_KEY_DEEPL_MODEL_TYPE]: DEFAULT_DEEPL_MODEL_TYPE,
+        [STORAGE_KEY_PAUSE_ON_TRANSLATE]: DEFAULT_PAUSE_ON_TRANSLATE,
+    };
+    browser.storage.local.set(defaults);
+    applyAdvancedSettings(defaults);
 });
 
 // We avoid <input type="color"> entirely: its OS/browser dialog steals focus,

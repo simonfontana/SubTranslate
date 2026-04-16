@@ -38,7 +38,12 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // DeepL auto-detects it. For reverse translations with auto-detect, `detectedSourceLang`
 // (from a prior forward translation's detected_source_language) is used as target_lang.
 async function translateWithDeepL(text, reverse = false, detectedSourceLang = null, context = null) {
-    const settings = await browser.storage.local.get([STORAGE_KEY_SOURCE_LANG, STORAGE_KEY_TARGET_LANG, STORAGE_KEY_DEEPL_API_KEY]);
+    const settings = await browser.storage.local.get([
+        STORAGE_KEY_SOURCE_LANG,
+        STORAGE_KEY_TARGET_LANG,
+        STORAGE_KEY_DEEPL_API_KEY,
+        STORAGE_KEY_DEEPL_MODEL_TYPE,
+    ]);
 
     const apiKey = settings[STORAGE_KEY_DEEPL_API_KEY];
     if (!apiKey) {
@@ -50,7 +55,9 @@ async function translateWithDeepL(text, reverse = false, detectedSourceLang = nu
 
     const url = `${getDeeplBaseUrl(apiKey)}/v2/translate`;
 
-    const params = buildTranslateParams(text, { sourceLang, targetLang }, context);
+    const params = buildTranslateParams(text, { sourceLang, targetLang }, context, {
+        modelType: settings[STORAGE_KEY_DEEPL_MODEL_TYPE] || DEFAULT_DEEPL_MODEL_TYPE,
+    });
     console.log("[DEBUG] DeepL request params:", params);
 
     try {

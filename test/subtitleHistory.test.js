@@ -72,6 +72,13 @@ describe("createSubtitleHistory", () => {
         assert.equal(a.getContext(), "only in a");
         assert.equal(b.getContext(), null);
     });
+
+    it("returns null regardless of records when size is 0", () => {
+        const h = createSubtitleHistory(0);
+        h.record("one");
+        h.record("two");
+        assert.equal(h.getContext(), null);
+    });
 });
 
 describe("joinSubtitleParts", () => {

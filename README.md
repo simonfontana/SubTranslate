@@ -9,7 +9,8 @@ A browser extension that lets you click words in video subtitles to instantly tr
 - **Click any translated word** in the tooltip to see its reverse translation (back to the source language).
 - **Right-click the tooltip** to copy the translation or the original text.
 - Handles hyphenated words split across subtitle lines (e.g. "komplett-" / "eringar" is joined into "kompletteringar" for translation).
-- **Customize subtitle font size** (8–72px) via extension settings for better readability.
+- **Customize subtitle font size** (8–72px) and highlight color via extension settings for better readability.
+- **Advanced options**: choose translation model (high quality vs. fast), adjust how many previous subtitle lines are sent as context to DeepL, and toggle whether the video pauses on translate.
 - **API usage tracker** in the popup footer shows characters used vs. limit with a color-coded progress bar.
 - Supports 29 languages via the DeepL API, with auto-detect for the source language.
 
@@ -47,7 +48,8 @@ You need a DeepL API key (free or paid). Get one at [deepl.com/your-account/keys
 1. Click the extension icon in the toolbar
 2. Select your source and target languages (saved automatically)
 3. Enter your DeepL API key (validated and saved automatically)
-4. Optionally, adjust the subtitle font size (8–72px) under the **Appearance** tab
+4. Optionally, adjust the subtitle font size (8–72px) and highlight color under the **Appearance** tab
+5. Optionally, tune the translation model, context history size, and pause-on-translate behaviour under the **Advanced** tab
 
 ## Usage
 

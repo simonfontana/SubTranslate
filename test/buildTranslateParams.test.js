@@ -28,4 +28,19 @@ describe("buildTranslateParams", () => {
         const params = buildTranslateParams("hello", { sourceLang: "EN", targetLang: "SV" });
         assert.equal(params.context, undefined);
     });
+
+    it("omits model_type when set to 'latency_optimized' (API default)", () => {
+        const params = buildTranslateParams("hello", { sourceLang: "EN", targetLang: "DE" }, null, { modelType: "latency_optimized" });
+        assert.equal(params.model_type, undefined);
+    });
+
+    it("includes model_type when set to prefer_quality_optimized", () => {
+        const params = buildTranslateParams("hello", { sourceLang: "EN", targetLang: "DE" }, null, { modelType: "prefer_quality_optimized" });
+        assert.equal(params.model_type, "prefer_quality_optimized");
+    });
+
+    it("omits model_type when options is empty", () => {
+        const params = buildTranslateParams("hello", { sourceLang: "EN", targetLang: "DE" });
+        assert.equal(params.model_type, undefined);
+    });
 });

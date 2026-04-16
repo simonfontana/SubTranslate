@@ -35,6 +35,14 @@ const STORAGE_KEY_TARGET_LANG = "targetLang";
 const STORAGE_KEY_DEEPL_API_KEY = "deeplApiKey";
 const STORAGE_KEY_SUBTITLE_FONT_SIZE = "subtitleFontSize";
 const STORAGE_KEY_HIGHLIGHT_COLOR = "highlightColor";
+const STORAGE_KEY_CONTEXT_HISTORY_SIZE = "contextHistorySize";
+const STORAGE_KEY_DEEPL_MODEL_TYPE = "deeplModelType";
+const STORAGE_KEY_PAUSE_ON_TRANSLATE = "pauseOnTranslate";
+
+// Advanced translation defaults
+const DEFAULT_CONTEXT_HISTORY_SIZE = 5;
+const DEFAULT_DEEPL_MODEL_TYPE = "prefer_quality_optimized";
+const DEFAULT_PAUSE_ON_TRANSLATE = true;
 
 // API configuration
 function getDeeplBaseUrl(apiKey) {

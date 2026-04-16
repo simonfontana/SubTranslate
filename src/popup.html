@@ -159,6 +159,7 @@
     <div class="tabs">
         <button class="tab-btn active" data-tab="general">General</button>
         <button class="tab-btn" data-tab="appearance">Appearance</button>
+        <button class="tab-btn" data-tab="advanced">Advanced</button>
     </div>
 
     <div id="tab-general" class="tab-panel active">
@@ -266,6 +267,25 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="tab-advanced" class="tab-panel">
+        <label for="contextHistorySize">Context history size:</label>
+        <input type="number" id="contextHistorySize" min="0" max="10" value="5" style="width: 100%;" />
+        <small>Previous subtitle lines sent to DeepL as context for better translations. Set to 0 to disable.</small>
+
+        <label for="deeplModelType">Translation model:</label>
+        <select id="deeplModelType">
+            <option value="prefer_quality_optimized">High quality</option>
+            <option value="latency_optimized">Fast</option>
+        </select>
+        <small>High quality uses DeepL's next-gen model where available; falls back to fast otherwise.</small>
+
+        <label style="margin-top: 10px; font-weight: normal;">
+            <input type="checkbox" id="pauseOnTranslate" /> Pause video on translate
+        </label>
+
+        <button type="button" id="resetAdvanced" style="margin-top: 14px; width: 100%; padding: 6px;">Reset to defaults</button>
     </div>
 
     <p id="statusMsg" style="font-size: 12px; color: green; margin-top: 6px;"></p>
