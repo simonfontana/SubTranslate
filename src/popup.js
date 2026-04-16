@@ -9,14 +9,85 @@ const sourceSelect = document.getElementById("sourceLang");
 const targetSelect = document.getElementById("targetLang");
 const apiKeyInput = document.getElementById("apiKey");
 const subtitleFontSizeInput = document.getElementById("subtitleFontSize");
+const presetSwatches = document.querySelectorAll("#colorSwatches .color-swatch[data-color]");
+const customColorPreview = document.getElementById("customColorPreview");
+const hueSlider = document.getElementById("hueSlider");
+const satSlider = document.getElementById("satSlider");
+const lightSlider = document.getElementById("lightSlider");
 const statusMsg = document.getElementById("statusMsg");
 
+function hslToHex(h, s, l) {
+    s /= 100;
+    l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => {
+        const c = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+        return Math.round(255 * c).toString(16).padStart(2, "0");
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function hexToHsl(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    let h = 0, s = 0;
+    if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h *= 60;
+    }
+    return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function updateSliderGradients() {
+    const h = hueSlider.value;
+    const s = satSlider.value;
+    const l = lightSlider.value;
+    satSlider.style.background = `linear-gradient(to right, hsl(${h}, 0%, ${l}%), hsl(${h}, 100%, ${l}%))`;
+    lightSlider.style.background = `linear-gradient(to right, hsl(${h}, ${s}%, 0%), hsl(${h}, ${s}%, 50%), hsl(${h}, ${s}%, 100%))`;
+}
+
+// syncSliders=false when called from a slider drag, to avoid round-tripping
+// the user's in-progress value through hexToHsl and back.
+function renderColor(color, syncSliders = true) {
+    const normalized = (color || "").toLowerCase();
+    let matched = false;
+    presetSwatches.forEach(btn => {
+        const isMatch = btn.dataset.color.toLowerCase() === normalized;
+        btn.classList.toggle("selected", isMatch);
+        if (isMatch) matched = true;
+    });
+    customColorPreview.classList.toggle("selected", !matched);
+    customColorPreview.style.background = normalized;
+    if (syncSliders && /^#[0-9a-f]{6}$/i.test(normalized)) {
+        const { h, s, l } = hexToHsl(normalized);
+        hueSlider.value = h;
+        satSlider.value = s;
+        lightSlider.value = l;
+    }
+    updateSliderGradients();
+}
+
+function commitColor(color, syncSliders = true) {
+    browser.storage.local.set({ [STORAGE_KEY_HIGHLIGHT_COLOR]: color });
+    renderColor(color, syncSliders);
+}
+
 // Restore previously saved settings into the form fields
-browser.storage.local.get([STORAGE_KEY_SOURCE_LANG, STORAGE_KEY_TARGET_LANG, STORAGE_KEY_DEEPL_API_KEY, STORAGE_KEY_SUBTITLE_FONT_SIZE]).then(data => {
+browser.storage.local.get([STORAGE_KEY_SOURCE_LANG, STORAGE_KEY_TARGET_LANG, STORAGE_KEY_DEEPL_API_KEY, STORAGE_KEY_SUBTITLE_FONT_SIZE, STORAGE_KEY_HIGHLIGHT_COLOR]).then(data => {
     if (data[STORAGE_KEY_SOURCE_LANG]) sourceSelect.value = data[STORAGE_KEY_SOURCE_LANG];
     if (data[STORAGE_KEY_TARGET_LANG]) targetSelect.value = data[STORAGE_KEY_TARGET_LANG];
     if (data[STORAGE_KEY_DEEPL_API_KEY]) apiKeyInput.value = data[STORAGE_KEY_DEEPL_API_KEY];
     if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) subtitleFontSizeInput.value = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
+    renderColor(data[STORAGE_KEY_HIGHLIGHT_COLOR] || DEFAULT_HIGHLIGHT_COLOR);
 });
 
 // Auto-save language and font size settings immediately on change
@@ -33,6 +104,20 @@ subtitleFontSizeInput.addEventListener("change", () => {
         [STORAGE_KEY_SUBTITLE_FONT_SIZE]: parseInt(subtitleFontSizeInput.value, 10) || DEFAULT_SUBTITLE_FONT_SIZE
     });
 });
+
+// We avoid <input type="color"> entirely: its OS/browser dialog steals focus,
+// which closes the extension popup on Chrome-on-Linux and Firefox before the
+// selection can be saved. Presets + in-popup HSL sliders stay inside the popup.
+presetSwatches.forEach(btn => {
+    btn.addEventListener("click", () => commitColor(btn.dataset.color));
+});
+
+function onSliderInput() {
+    commitColor(hslToHex(+hueSlider.value, +satSlider.value, +lightSlider.value), false);
+}
+hueSlider.addEventListener("input", onSliderInput);
+satSlider.addEventListener("input", onSliderInput);
+lightSlider.addEventListener("input", onSliderInput);
 
 // Show API key as plain text while focused, masked otherwise
 apiKeyInput.addEventListener("focus", () => { apiKeyInput.type = "text"; });

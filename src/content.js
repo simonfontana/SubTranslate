@@ -60,6 +60,28 @@ browser.storage.onChanged.addListener((changes, area) => {
     }
 });
 
+// Apply the user's highlight color via CSS custom properties on <html>.
+// Two variables are set: a solid color and a 40%-alpha variant used by the
+// reverse-translation popup and the SVT Play cue override (see content.css).
+function applyHighlightColor(hex) {
+    const normalized = /^#[0-9a-f]{6}$/i.test(hex) ? hex : DEFAULT_HIGHLIGHT_COLOR;
+    const r = parseInt(normalized.slice(1, 3), 16);
+    const g = parseInt(normalized.slice(3, 5), 16);
+    const b = parseInt(normalized.slice(5, 7), 16);
+    const root = document.documentElement;
+    root.style.setProperty("--subtranslate-highlight", normalized);
+    root.style.setProperty("--subtranslate-highlight-soft", `rgba(${r}, ${g}, ${b}, 0.4)`);
+}
+
+browser.storage.local.get(STORAGE_KEY_HIGHLIGHT_COLOR).then(data => {
+    applyHighlightColor(data[STORAGE_KEY_HIGHLIGHT_COLOR] || DEFAULT_HIGHLIGHT_COLOR);
+});
+browser.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes[STORAGE_KEY_HIGHLIGHT_COLOR]) {
+        applyHighlightColor(changes[STORAGE_KEY_HIGHLIGHT_COLOR].newValue || DEFAULT_HIGHLIGHT_COLOR);
+    }
+});
+
 // SVT Play (Chrome): the browser renders subtitles via native TextTrack / ::cue
 // inside the video element's internal rendering, not as DOM elements we can click.
 // Detect this case and create a custom clickable overlay from the TextTrack cue data.

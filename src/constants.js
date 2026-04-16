@@ -4,6 +4,9 @@
 const DEFAULT_SUBTITLE_FONT_SIZE = 40;
 const CONTEXT_MENU_FONT_SIZE = "14px";
 
+// Highlight color (applied to translated word/sentence and reverse-translation highlights)
+const DEFAULT_HIGHLIGHT_COLOR = "#ffff00";
+
 // Tooltip positioning and spacing
 const TOOLTIP_POSITION_OFFSET = 10; // Offset from click coordinates and subtitle spacing
 const TOOLTIP_PADDING = "10px";
@@ -31,6 +34,7 @@ const STORAGE_KEY_SOURCE_LANG = "sourceLang";
 const STORAGE_KEY_TARGET_LANG = "targetLang";
 const STORAGE_KEY_DEEPL_API_KEY = "deeplApiKey";
 const STORAGE_KEY_SUBTITLE_FONT_SIZE = "subtitleFontSize";
+const STORAGE_KEY_HIGHLIGHT_COLOR = "highlightColor";
 
 // API configuration
 function getDeeplBaseUrl(apiKey) {
