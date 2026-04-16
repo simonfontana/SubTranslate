@@ -166,8 +166,11 @@ const { record: recordSubtitle, getContext: getSubtitleContext } = createSubtitl
 // so restoreHighlights() can put the original DOM back.
 let lastHighlightedSegments = [];
 
-// Find subtitle element at click coordinates — needed when an overlay sits on top of subtitles
+// Find subtitle element at click coordinates — needed when an overlay sits on top of subtitles.
+// Events inside our own context menu are ignored, so menu items keep priority over the
+// subtitle beneath them (otherwise elementsFromPoint below would "see through" the menu).
 function findSubtitleAt(event) {
+    if (event.target?.closest?.("#subtitle-translate-context-menu")) return null;
     const direct = event.target.closest(SUBTITLE_SELECTOR);
     if (direct) return direct;
     // Look through all elements stacked at this point (handles overlays)
@@ -301,6 +304,34 @@ document.addEventListener("click", (event) => {
     handleClick(caret, event.clientX, event.clientY, clickedElement);
 }, true);
 
+// Right-click on a subtitle: show a context menu with "Copy" (the right-clicked word)
+// and "Copy sentence" (the sentence containing that word). Does not pause the video;
+// the word and sentence are captured synchronously so the copy still works even if
+// the subtitle changes before the user picks a menu item.
+document.addEventListener("contextmenu", (event) => {
+    const subtitleElement = findSubtitleAt(event);
+    if (!subtitleElement) return;
+
+    const caret = caretInSubtitle(event.clientX, event.clientY, subtitleElement);
+    if (!caret?.offsetNode?.textContent) return;
+
+    const text = caret.offsetNode.textContent;
+    const caretWord = extractWordAtOffset(text, caret.offset);
+    if (!caretWord) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const { word } = joinHyphenatedWord(caretWord.word, text, caretWord.end, subtitleElement);
+    const joinedText = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR)).map(s => s.textContent).join(" ");
+    const sentence = getFullSentenceFromSubtitles(joinedText, word) || subtitleElement.textContent.trim();
+
+    showContextMenu(event.clientX, event.clientY, [
+        { label: "Copy", onSelect: () => navigator.clipboard.writeText(word) },
+        { label: "Copy sentence", onSelect: () => navigator.clipboard.writeText(sentence) },
+    ]);
+}, true);
+
 // Double-click on a subtitle: translate the sentence containing the clicked word.
 // The currentTranslationId bump discards any in-flight single-click translation.
 document.addEventListener("dblclick", (event) => {
@@ -365,7 +396,6 @@ async function handleClick(caret, clientX, clientY, captionElement) {
         detectedSourceLang: wordResult.detectedSourceLang || null,
         x: clientX,
         y: clientY,
-        originalText: clickedWord,
     });
 }
 
@@ -402,7 +432,6 @@ async function handleDoubleClick(event, captionElement, caret) {
         detectedSourceLang: sentenceResult.detectedSourceLang || null,
         x: event.clientX,
         y: event.clientY,
-        originalText: sentenceText,
         isSentence: true,
     });
 }
@@ -468,73 +497,75 @@ function createTooltipShell({ wordTranslation, x, y }) {
     return { tooltip, subtitleRect };
 }
 
+// Show a context menu at (x, y) with the given items.
+// Each item is { label, onSelect }; onSelect runs then the menu dismisses itself.
+// Dismisses on any outside click.
+function showContextMenu(x, y, items) {
+    document.getElementById("subtitle-translate-context-menu")?.remove();
+
+    const menu = document.createElement("div");
+    menu.id = "subtitle-translate-context-menu";
+    Object.assign(menu.style, {
+        position: "fixed",
+        background: "rgba(30, 30, 30, 0.97)",
+        color: "#fff",
+        borderRadius: CONTEXT_MENU_BORDER_RADIUS,
+        padding: CONTEXT_MENU_PADDING,
+        zIndex: CONTEXT_MENU_Z_INDEX,
+        minWidth: CONTEXT_MENU_MIN_WIDTH,
+        boxShadow: CONTEXT_MENU_BOX_SHADOW,
+        fontFamily: "'YouTube Noto', Roboto, Arial, Helvetica, sans-serif",
+        fontSize: CONTEXT_MENU_FONT_SIZE,
+        // Initially off-screen; repositioned in rAF once dimensions are known
+        top: "-9999px",
+        left: "-9999px",
+    });
+
+    const dismissMenu = () => {
+        menu.remove();
+        document.removeEventListener("click", onClickOutside, true);
+    };
+    const onClickOutside = (e) => {
+        if (!menu.contains(e.target)) dismissMenu();
+    };
+
+    for (const { label, onSelect } of items) {
+        const item = document.createElement("div");
+        item.textContent = label;
+        Object.assign(item.style, { padding: CONTEXT_MENU_ITEM_PADDING, cursor: "pointer" });
+        item.addEventListener("mouseenter", () => { item.style.background = "rgba(255,255,255,0.15)"; });
+        item.addEventListener("mouseleave", () => { item.style.background = ""; });
+        item.addEventListener("click", () => {
+            onSelect();
+            dismissMenu();
+        });
+        menu.appendChild(item);
+    }
+
+    (document.fullscreenElement ?? document.body).appendChild(menu);
+
+    requestAnimationFrame(() => {
+        menu.style.top = `${y - menu.offsetHeight}px`;
+        menu.style.left = `${x}px`;
+    });
+
+    document.addEventListener("click", onClickOutside, true);
+}
+
 // Attaches a custom right-click context menu to the tooltip.
-// Offers "Copy" (the translation text) and "Copy original" (the source text).
-// `state.currentOriginal` is read at click-time so it reflects sentence-expansion updates.
-function attachContextMenu(tooltip, state) {
+// Word view: only "Copy" (the translated word).
+// Sentence view: "Copy" and "Copy sentence" (both copy the translated sentence,
+// since the tooltip's content is the sentence).
+function attachContextMenu(tooltip, isSentence) {
     tooltip.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         event.stopPropagation();
 
-        const existing = document.getElementById("subtitle-translate-context-menu");
-        if (existing) existing.remove();
+        const copy = () => navigator.clipboard.writeText(tooltip.textContent);
+        const items = [{ label: "Copy", onSelect: copy }];
+        if (isSentence) items.push({ label: "Copy sentence", onSelect: copy });
 
-        const menu = document.createElement("div");
-        menu.id = "subtitle-translate-context-menu";
-        Object.assign(menu.style, {
-            position: "fixed",
-            background: "rgba(30, 30, 30, 0.97)",
-            color: "#fff",
-            borderRadius: CONTEXT_MENU_BORDER_RADIUS,
-            padding: CONTEXT_MENU_PADDING,
-            zIndex: CONTEXT_MENU_Z_INDEX,
-            minWidth: CONTEXT_MENU_MIN_WIDTH,
-            boxShadow: CONTEXT_MENU_BOX_SHADOW,
-            fontFamily: "'YouTube Noto', Roboto, Arial, Helvetica, sans-serif",
-            fontSize: CONTEXT_MENU_FONT_SIZE,
-        });
-        // Initially off-screen; repositioned in rAF once dimensions are known
-        menu.style.top = "-9999px";
-        menu.style.left = "-9999px";
-
-        const dismissMenu = () => {
-            menu.remove();
-            document.removeEventListener("click", onClickOutside, true);
-        };
-        const onClickOutside = (e) => {
-            if (!menu.contains(e.target)) dismissMenu();
-        };
-
-        const copyItem = document.createElement("div");
-        copyItem.textContent = "Copy";
-        Object.assign(copyItem.style, { padding: CONTEXT_MENU_ITEM_PADDING, cursor: "pointer" });
-        copyItem.addEventListener("mouseenter", () => { copyItem.style.background = "rgba(255,255,255,0.15)"; });
-        copyItem.addEventListener("mouseleave", () => { copyItem.style.background = ""; });
-        copyItem.addEventListener("click", () => {
-            navigator.clipboard.writeText(tooltip.textContent);
-            dismissMenu();
-        });
-
-        const copyOriginalItem = document.createElement("div");
-        copyOriginalItem.textContent = "Copy original";
-        Object.assign(copyOriginalItem.style, { padding: CONTEXT_MENU_ITEM_PADDING, cursor: "pointer" });
-        copyOriginalItem.addEventListener("mouseenter", () => { copyOriginalItem.style.background = "rgba(255,255,255,0.15)"; });
-        copyOriginalItem.addEventListener("mouseleave", () => { copyOriginalItem.style.background = ""; });
-        copyOriginalItem.addEventListener("click", () => {
-            navigator.clipboard.writeText(state.currentOriginal);
-            dismissMenu();
-        });
-
-        menu.appendChild(copyItem);
-        menu.appendChild(copyOriginalItem);
-        (document.fullscreenElement ?? document.body).appendChild(menu);
-
-        requestAnimationFrame(() => {
-            menu.style.top = `${event.clientY - menu.offsetHeight}px`;
-            menu.style.left = `${event.clientX}px`;
-        });
-
-        document.addEventListener("click", onClickOutside, true);
+        showContextMenu(event.clientX, event.clientY, items);
     });
 }
 
@@ -617,11 +648,10 @@ function attachWordReverseTranslation(tooltip, state) {
     });
 }
 
-// `state.currentOriginal` tracks what "Copy original" should return.
-function showTooltip({ wordTranslation, detectedSourceLang, x, y, originalText, isSentence }) {
-    const state = { currentOriginal: originalText, detectedSourceLang };
+function showTooltip({ wordTranslation, detectedSourceLang, x, y, isSentence }) {
+    const state = { detectedSourceLang };
     const { tooltip, subtitleRect } = createTooltipShell({ wordTranslation, x, y });
-    attachContextMenu(tooltip, state);
+    attachContextMenu(tooltip, isSentence);
 
     if (isSentence) {
         renderSentenceView({ tooltip, subtitleRect, wordTranslation, state });
