@@ -31,6 +31,19 @@ div:has(.vtt-cue-teletext) {
     pointer-events: auto !important;
 }
 
+/* svt.se: the subtitles-container and its contents have pointer-events:none set by the player.
+   Override so clicks and elementsFromPoint() can reach the subtitle elements. */
+[data-rt="subtitles-container"],
+[data-rt="subtitles-container"] * {
+    pointer-events: auto !important;
+}
+
+/* svt.se: portrait/vertical video subtitle overlay also has pointer-events:none. */
+[class*="VideoPlayerSubtitles__root"],
+[class*="VideoPlayerSubtitles__root"] * {
+    pointer-events: auto !important;
+}
+
 /* SVT Play (Chrome): custom subtitle overlay created from native TextTrack data.
    Positioned at the bottom of the video, styled to match SVT Play's native subtitles. */
 .subtranslate-subtitle-container {

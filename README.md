@@ -1,6 +1,6 @@
 # SubTranslate
 
-A browser extension that lets you click words in video subtitles to instantly translate them using the DeepL API. Works on YouTube and SVT Play.
+A browser extension that lets you click words in video subtitles to instantly translate them using the DeepL API. Works on YouTube, SVT Play, and svt.se.
 
 ## Features
 
@@ -20,6 +20,7 @@ A browser extension that lets you click words in video subtitles to instantly tr
 |------|-------------------|
 | YouTube | `.ytp-caption-segment` |
 | SVT Play | `.vtt-cue-teletext` |
+| svt.se | `.vtt-cue-teletext` (custom TextTrack overlay) |
 
 ## Installation
 

@@ -32,6 +32,7 @@ function makeVideoSiteConfig(subtitleSelector) {
 const SITE_CONFIGS = {
     "www.youtube.com": makeVideoSiteConfig(".ytp-caption-segment"),
     "www.svtplay.se":  makeVideoSiteConfig(".vtt-cue-teletext"),
+    "www.svt.se":      makeVideoSiteConfig('.vtt-cue-teletext, [data-rt="subtitles-container"] div:has(> span), [class*="VideoPlayerSubtitles__text"]'),
 };
 
 const siteConfig = SITE_CONFIGS[window.location.hostname];
@@ -85,14 +86,27 @@ browser.storage.onChanged.addListener((changes, area) => {
 // SVT Play (Chrome): the browser renders subtitles via native TextTrack / ::cue
 // inside the video element's internal rendering, not as DOM elements we can click.
 // Detect this case and create a custom clickable overlay from the TextTrack cue data.
-if (window.location.hostname === 'www.svtplay.se') {
+if (window.location.hostname === 'www.svtplay.se' || window.location.hostname === 'www.svt.se') {
     (function initCustomSubtitles() {
         let overlay = null;
         let currentTrack = null;
+        let originalSubtitleContainer = null;
+
+        // Hide the site's own subtitle container (aside-panel duplicate on landscape videos).
+        // Idempotent — safe to call on every cue change for lazy discovery. Does nothing on
+        // sites/paths (e.g. portrait videos) that never have an aside-panel duplicate.
+        function hideOriginalSubtitleContainer() {
+            if (!originalSubtitleContainer) {
+                originalSubtitleContainer = document.querySelector('[class*="VideoPlayerSubtitles__container"]');
+            }
+            if (originalSubtitleContainer) originalSubtitleContainer.style.display = 'none';
+        }
 
         function renderCues() {
             if (!overlay || !currentTrack) return;
             overlay.innerHTML = '';
+            // May not exist at setup() time; check on every cue change until found.
+            hideOriginalSubtitleContainer();
             const cues = currentTrack.activeCues;
             if (!cues) return;
             for (let i = 0; i < cues.length; i++) {
@@ -115,6 +129,7 @@ if (window.location.hostname === 'www.svtplay.se') {
             if (currentTrack) currentTrack.removeEventListener('cuechange', renderCues);
             currentTrack = track;
             track.mode = 'hidden'; // keep cues active but hide native rendering
+            hideOriginalSubtitleContainer();
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.className = 'subtranslate-subtitle-container';
@@ -143,6 +158,16 @@ if (window.location.hostname === 'www.svtplay.se') {
                     return true;
                 }
             }
+            // Fallback: some svt.se videos render subtitles as React DOM elements directly in the
+            // player's subtitles-container (no TextTrack). Use them directly; hide the aside-panel duplicate.
+            if (document.querySelector('[data-rt="subtitles-container"] div:has(> span)')) {
+                hideOriginalSubtitleContainer();
+                return true;
+            }
+            // Fallback: some svt.se videos (e.g. portrait/vertical clips) render subtitles via a
+            // VideoPlayerSubtitles__root overlay inside the player. Use them directly — do NOT hide
+            // the container, as it is the primary subtitle renderer (not an aside duplicate).
+            if (document.querySelector('[class*="VideoPlayerSubtitles__text"]')) return true;
             return false;
         }
 
@@ -155,6 +180,10 @@ if (window.location.hostname === 'www.svtplay.se') {
                     if (overlay) overlay.innerHTML = '';
                     currentTrack.removeEventListener('cuechange', renderCues);
                     currentTrack = null;
+                    if (originalSubtitleContainer) {
+                        originalSubtitleContainer.style.display = '';
+                        originalSubtitleContainer = null;
+                    }
                     return;
                 }
                 // A track was switched to 'showing' — find and set it up
@@ -218,9 +247,10 @@ browser.storage.onChanged.addListener((changes, area) => {
 let lastHighlightedSegments = [];
 
 // Find subtitle element at click coordinates — needed when an overlay sits on top of subtitles.
-// Events inside our own context menu are ignored, so menu items keep priority over the
-// subtitle beneath them (otherwise elementsFromPoint below would "see through" the menu).
+// Our own tooltip and context menu are excluded so their mousedown handlers aren't blocked
+// by suppressEvents (otherwise elementsFromPoint would "see through" them to subtitles below).
 function findSubtitleAt(event) {
+    if (event.target?.closest?.("#subtitle-translate-tooltip")) return null;
     if (event.target?.closest?.("#subtitle-translate-context-menu")) return null;
     const direct = event.target.closest(SUBTITLE_SELECTOR);
     if (direct) return direct;
@@ -284,19 +314,33 @@ function caretInSubtitle(x, y, subtitleEl) {
     return caret;
 }
 
-// Intercept mousedown/pointerdown in the capture phase on subtitle elements.
-// YouTube (and SVT Play) attach their own handlers that would swallow the click
-// before our "click" listener fires. By stopping propagation here, we ensure
-// the subsequent "click" event reaches our handler below.
+// For sites with suppressEvents, trigger subtitle translation on mousedown rather than click.
+// Some players (e.g. svt.se portrait videos) attach a document-level capture click handler
+// that calls stopImmediatePropagation, so our click listener never fires for subtitle elements
+// inside the player container. mousedown is not intercepted this way.
+// The flag prevents the click handler below from double-triggering on sites where the click
+// event does reach our handler (e.g. svt.se landscape, where our overlay is outside the
+// player's click-interception area).
+let suppressNextSubtitleClick = false;
+
 if (siteConfig.suppressEvents) {
-    for (const eventType of ["mousedown", "pointerdown"]) {
-        document.addEventListener(eventType, (event) => {
-            if (findSubtitleAt(event)) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-        }, true);
-    }
+    document.addEventListener("mousedown", (event) => {
+        const subtitle = findSubtitleAt(event);
+        if (!subtitle) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.button === 0 && event.detail === 1) {
+            suppressNextSubtitleClick = true;
+            const caret = caretInSubtitle(event.clientX, event.clientY, subtitle);
+            handleClick(caret, event.clientX, event.clientY, subtitle);
+        }
+    }, true);
+    document.addEventListener("pointerdown", (event) => {
+        if (findSubtitleAt(event)) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }, true);
 }
 
 // Click-outside cleanup: dismiss tooltip, restore highlights, and resume video
@@ -319,6 +363,24 @@ function segmentText(segment) {
     return joinSubtitleParts(Array.from(segment.childNodes).map(n => n.textContent));
 }
 
+// Return the subtitle segments that belong to the same rendering path as captionElement.
+// SUBTITLE_SELECTOR is a union across all rendering paths (e.g. on svt.se portrait, the
+// TextTrack overlay, the data-rt container, and the VideoPlayerSubtitles__text element all
+// appear in the DOM simultaneously). Filtering by parentElement constrains queries to a single
+// path so that globalOffset arithmetic and sentence highlighting don't accidentally operate on
+// elements from a different path.
+// Falls back to all matching segments if captionElement is detached (no parentElement).
+function segmentsForCaption(captionElement) {
+    const all = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
+    const captionParent = captionElement.parentElement;
+    if (!captionParent) return all;
+    return all.filter(seg =>
+        seg.parentElement === captionParent ||
+        captionElement.contains(seg) ||
+        seg.contains(captionElement)
+    );
+}
+
 // Concatenate all visible subtitle segments into a single string.
 function getAllSubtitleText(segments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR))) {
     return segments.map(segmentText).join(" ").trim();
@@ -337,10 +399,10 @@ setInterval(() => {
 }, SUBTITLE_POLL_INTERVAL_MS);
 
 // Single-click on a subtitle word: translate just that word.
-// Fires immediately for a responsive feel. On double-click, the browser fires
-// a second click with detail=2 before dblclick — we skip that so only the
-// dblclick handler runs. The currentTranslationId mechanism discards any
-// in-flight word translation if a dblclick supersedes it.
+// For suppressEvents sites this is handled in the mousedown listener above; the flag
+// prevents double-triggering on sites where the click also reaches this handler.
+// On double-click, the browser fires a second click with detail=2 before dblclick —
+// we skip that so only the dblclick handler runs.
 document.addEventListener("click", (event) => {
     const clickedElement = findSubtitleAt(event);
     if (!clickedElement) return;
@@ -350,6 +412,9 @@ document.addEventListener("click", (event) => {
 
     // Skip the second click of a double-click; dblclick handler takes over.
     if (event.detail > 1) return;
+
+    // Already handled by mousedown on suppressEvents sites.
+    if (suppressNextSubtitleClick) { suppressNextSubtitleClick = false; return; }
 
     const caret = caretInSubtitle(event.clientX, event.clientY, clickedElement);
     handleClick(caret, event.clientX, event.clientY, clickedElement);
@@ -443,8 +508,15 @@ async function handleClick(caret, clientX, clientY, captionElement) {
 
     // Capture the word's absolute position across all visible segments *before* pausing,
     // because pausing may cause the site to re-render subtitles (new DOM nodes).
-    const preSegments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
+    // segmentsForCaption constrains to the same rendering path as the clicked element —
+    // see its docstring for why this matters on sites with multiple simultaneous paths.
+    const preSegments = segmentsForCaption(captionElement);
     const globalOffset = getGlobalTextOffset(preSegments, captionElement, caret.offsetNode, start, document);
+
+    // Capture subtitle bounding rect *before* pausing. Some sites clear or hide subtitle
+    // elements after the video pauses (see "Staleness & DOM Re-render Handling" in CLAUDE.md),
+    // which causes post-pause getBoundingClientRect() to return all-zero dimensions.
+    const subtitleRect = captionElement.getBoundingClientRect();
 
     if (pauseOnTranslate) {
         siteConfig.pauseVideo();
@@ -461,7 +533,7 @@ async function handleClick(caret, clientX, clientY, captionElement) {
     // After pause + settle, subtitle DOM may be entirely new nodes. Re-query and use
     // the saved globalOffset to find and highlight the correct word occurrence.
     // (When not pausing, we're using the original nodes, but re-querying is still safe.)
-    const segments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
+    const segments = segmentsForCaption(captionElement);
     const highlighted = highlightWordAcrossSegments(segments, highlightWord, globalOffset, document);
     if (highlighted) lastHighlightedSegments = highlighted;
 
@@ -474,6 +546,7 @@ async function handleClick(caret, clientX, clientY, captionElement) {
         detectedSourceLang: wordResult.detectedSourceLang || null,
         x: clientX,
         y: clientY,
+        subtitleRect,
     });
 }
 
@@ -483,6 +556,9 @@ async function handleDoubleClick(event, captionElement, caret) {
     // rather than using the full caption element text (which could span multiple sentences).
     const caretWord = caret?.offsetNode?.textContent ? extractWordAtOffset(caret.offsetNode.textContent, caret.offset) : null;
     const clickedWord = caretWord?.word || captionElement.textContent.trim();
+
+    // Capture subtitle bounding rect *before* pausing (same reason as in handleClick).
+    const subtitleRect = captionElement.getBoundingClientRect();
 
     if (pauseOnTranslate) {
         siteConfig.pauseVideo();
@@ -497,7 +573,9 @@ async function handleDoubleClick(event, captionElement, caret) {
     }
 
     // After pause + settle, subtitle DOM may be entirely new nodes. Re-query.
-    const allSegments = Array.from(document.querySelectorAll(SUBTITLE_SELECTOR));
+    // segmentsForCaption constrains to the same rendering path as the clicked element
+    // (see its docstring for why this matters on sites with multiple simultaneous paths).
+    const allSegments = segmentsForCaption(captionElement);
     // Use raw textContent so sentence substrings match the DOM for highlighting.
     const joinedText = allSegments.map(s => s.textContent).join(" ");
     const sentenceText = getFullSentenceFromSubtitles(joinedText, clickedWord) || captionElement.textContent.trim();
@@ -515,6 +593,7 @@ async function handleDoubleClick(event, captionElement, caret) {
         x: event.clientX,
         y: event.clientY,
         isSentence: true,
+        subtitleRect,
     });
 }
 
@@ -531,7 +610,7 @@ function cleanup() {
 // Creates the tooltip shell (container + translated-word header) and appends it to the
 // document. Returns the tooltip element and the subtitle bounding rect (for positioning).
 // Starts with opacity:0 and positions in a rAF callback to avoid a flash at wrong position.
-function createTooltipShell({ wordTranslation, x, y }) {
+function createTooltipShell({ wordTranslation, x, y, subtitleRect }) {
     const tooltip = document.createElement("div");
     tooltip.id = "subtitle-translate-tooltip";
 
@@ -559,24 +638,26 @@ function createTooltipShell({ wordTranslation, x, y }) {
     lastTooltip = tooltip;
 
     // Position tooltip above the subtitle element (centered horizontally on it).
-    // Falls back to click coordinates if no subtitle element is found.
-    const subtitleElement = document.querySelector(SUBTITLE_SELECTOR);
-    const subtitleRect = subtitleElement ? subtitleElement.getBoundingClientRect() : null;
-
+    // subtitleRect is captured *before* the video is paused — some sites clear or hide the
+    // subtitle element on pause, so a post-pause query would return all-zero dimensions.
+    // Falls back to click coordinates if the rect is missing or zero-sized.
     requestAnimationFrame(() => {
         const tooltipRect = tooltip.getBoundingClientRect();
-        let tooltipTop = y + TOOLTIP_POSITION_OFFSET;
-        let tooltipLeft = x + TOOLTIP_POSITION_OFFSET;
-        if (subtitleRect) {
+        let tooltipTop, tooltipLeft;
+        if (subtitleRect && subtitleRect.width > 0) {
             tooltipTop = subtitleRect.top - tooltipRect.height - TOOLTIP_POSITION_OFFSET;
             tooltipLeft = subtitleRect.left + subtitleRect.width / 2;
+        } else {
+            // Fall back to click coordinates: position tooltip above the click point.
+            tooltipTop = y - tooltipRect.height - TOOLTIP_POSITION_OFFSET;
+            tooltipLeft = x;
         }
         tooltip.style.top = `${tooltipTop}px`;
         tooltip.style.left = `${tooltipLeft}px`;
         tooltip.style.opacity = "1";
     });
 
-    return { tooltip, subtitleRect };
+    return { tooltip };
 }
 
 // Show a context menu at (x, y) with the given items.
@@ -617,7 +698,8 @@ function showContextMenu(x, y, items) {
         Object.assign(item.style, { padding: CONTEXT_MENU_ITEM_PADDING, cursor: "pointer" });
         item.addEventListener("mouseenter", () => { item.style.background = "rgba(255,255,255,0.15)"; });
         item.addEventListener("mouseleave", () => { item.style.background = ""; });
-        item.addEventListener("click", () => {
+        item.addEventListener("mousedown", (event) => {
+            if (event.button !== 0) return;
             onSelect();
             dismissMenu();
         });
@@ -673,14 +755,17 @@ function renderSentenceView({ tooltip, subtitleRect, wordTranslation, state }) {
     // Reposition tooltip upward since sentence text is taller than a single word
     requestAnimationFrame(() => {
         const newRect = tooltip.getBoundingClientRect();
-        if (subtitleRect) {
+        // Same guard as createTooltipShell: only use subtitle rect if it has non-zero size
+        // (a zero rect means the element was hidden/cleared before we could measure it).
+        if (subtitleRect && subtitleRect.width > 0) {
             tooltip.style.top = `${subtitleRect.top - newRect.height - 10}px`;
         }
     });
 
     // Reverse translation: clicking a word highlights it and shows a popup above the tooltip.
     sentenceDiv.querySelectorAll('.translated-word').forEach(span => {
-        span.addEventListener('click', async () => {
+        span.addEventListener('mousedown', async (event) => {
+            if (event.button !== 0) return;
             removeReversePopup(tooltip);
             // Highlight the clicked word, clearing any previous highlight
             sentenceDiv.querySelectorAll('.translated-word').forEach(s => s.classList.remove('highlight-reverse'));
@@ -719,7 +804,8 @@ function showReversePopup(tooltip, text) {
 function attachWordReverseTranslation(tooltip, state) {
     const translatedWordElement = tooltip.querySelector("#translatedWord");
     translatedWordElement.style.cursor = "pointer";
-    translatedWordElement.addEventListener("click", async () => {
+    translatedWordElement.addEventListener("mousedown", async (event) => {
+        if (event.button !== 0) return;
         removeReversePopup(tooltip);
         translatedWordElement.classList.add('highlight-reverse');
 
@@ -730,9 +816,9 @@ function attachWordReverseTranslation(tooltip, state) {
     });
 }
 
-function showTooltip({ wordTranslation, detectedSourceLang, x, y, isSentence }) {
+function showTooltip({ wordTranslation, detectedSourceLang, x, y, isSentence, subtitleRect }) {
     const state = { detectedSourceLang };
-    const { tooltip, subtitleRect } = createTooltipShell({ wordTranslation, x, y });
+    const { tooltip } = createTooltipShell({ wordTranslation, x, y, subtitleRect });
     attachContextMenu(tooltip, isSentence);
 
     if (isSentence) {

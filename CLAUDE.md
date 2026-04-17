@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-A Chrome/Firefox WebExtension that integrates with YouTube and SVT Play to provide real-time subtitle translation using the DeepL API. No build system — files are loaded directly as an unpacked extension.
+A Chrome/Firefox WebExtension that integrates with YouTube, SVT Play, and svt.se to provide real-time subtitle translation using the DeepL API. No build system — files are loaded directly as an unpacked extension.
 
 - `manifest.firefox.json` — Firefox (MV2)
 - `manifest.chrome.json` — Chrome (MV3)
@@ -63,9 +63,20 @@ Several mechanisms work together to handle the fact that pausing the video can c
 
 - **Caret captured immediately**: `caretInSubtitle()` is called synchronously at click time, because the DOM may change after the video is paused.
 - **Global text offset**: `getGlobalTextOffset()` converts a (node, charStart) pair into a numeric position in the virtual concatenation of all segments' textContent. This survives DOM re-renders because it's a character position, not a node reference.
+- **Subtitle rect captured pre-pause**: `captionElement.getBoundingClientRect()` is called before pausing for tooltip positioning. Some sites (e.g. svt.se portrait videos via React) clear or hide subtitle elements when the video pauses, making post-pause rect queries return all-zero dimensions. Capturing before pause ensures the tooltip always positions above the subtitle area regardless of what the site does to the DOM after pause.
 - **`waitForSubtitleSettle()`**: After pausing, waits for the subtitle container's MutationObserver to go quiet (50ms after last mutation, or 150ms timeout if no mutation at all).
 - **Re-query after settle**: After the DOM settles, subtitle elements are re-queried from the DOM and `highlightWordAcrossSegments()` uses the saved global offset to find the correct word occurrence in the new nodes.
 - **`currentTranslationId`**: Monotonically increasing counter that detects stale async responses. Each click bumps the ID; when a translation response arrives, it's discarded if the ID no longer matches.
+
+## Multi-Path Rendering and `segmentsForCaption`
+
+`SUBTITLE_SELECTOR` is a CSS union across every rendering path for a site (e.g. for svt.se it matches elements from the TextTrack overlay, the `data-rt` React container, and the `VideoPlayerSubtitles__text` element). On sites where multiple paths are active simultaneously, `querySelectorAll(SUBTITLE_SELECTOR)` returns elements from all of them at once.
+
+This matters for two operations:
+1. **`globalOffset` arithmetic** in `handleClick`: the offset is computed as a character position in the concatenation of all queried segments. If segment count differs between the pre-pause query (which computed the offset) and the post-settle query (which resolves it), the wrong word is highlighted.
+2. **Sentence highlighting** in `handleDoubleClick`: `highlightSentenceAcrossSegments` searches all queried segments in order. If the clicked element belongs to path 3 (portrait) but path 1 (TextTrack) appears earlier in the list, the sentence match lands in the wrong element and highlights nothing visible.
+
+`segmentsForCaption(captionElement)` filters the result of `querySelectorAll(SUBTITLE_SELECTOR)` to only segments that share the direct parent of `captionElement`, making all segment queries path-local. Both handlers use it for every segment query (both pre-pause and post-settle). Any new site that has duplicate or mirrored subtitle containers will be handled correctly without special-casing.
 
 ## Highlighting Technique
 
@@ -82,6 +93,8 @@ This is necessary because a word/sentence can span multiple text nodes (e.g. in 
 
 1. **Word view** (single-click): Shows the translated word in bold. Clicking it highlights the word (yellow background via `.highlight-reverse`) and shows a reverse translation popup above the tooltip (target → source language). Right-click opens a custom context menu with "Copy" / "Copy original".
 2. **Sentence view** (double-click): Each word in the translated sentence is rendered as a clickable `<span>`. Clicking any word highlights it (`.highlight-reverse`) and shows a reverse translation popup above the tooltip (uses `reverse: true` in the message to background.js).
+
+**Implementation note**: For sites with `suppressEvents: true`, subtitle word clicks and tooltip/menu interactions use `mousedown` rather than `click`. Some players (notably svt.se portrait videos) attach a document-level capture-phase `click` handler that calls `stopImmediatePropagation()`, preventing any `click` listeners registered after the player from firing. `mousedown` is not intercepted this way. For landscape svt.se, the click event still reaches our handler (our subtitle overlay is outside the player's click-interception area), so the `suppressNextSubtitleClick` flag prevents double-triggering when both mousedown and click fire.
 
 ## content.css
 
@@ -105,6 +118,21 @@ This is necessary because a word/sentence can span multiple text nodes (e.g. in 
 - SVT Play is a Next.js app; CSS class names like `css-1okjmlg` are dynamically generated and unstable — always target semantic class names like `.vtt-cue-teletext` instead
 - Each `.vtt-cue-teletext` element contains one `<span>` per subtitle line (e.g. `<span>komplett-</span><span>eringar ...</span>`). `getCaretPosition` returns a text node inside one `<span>`, so the text boundary of a single word may not extend across line breaks. Use `captionElement.textContent` (which concatenates all inner spans) to reason about the full cue text.
 - DOM node references captured at click time (via `getCaretPosition`) may become stale after the video is paused (the site may re-render subtitles). Do not rely on node identity (`===`) for previously captured nodes — compare by content or offset instead.
+
+### svt.se (`www.svt.se`)
+- Subtitle selector: `.vtt-cue-teletext` (TextTrack overlay path), `[data-rt="subtitles-container"] div:has(> span)` (React DOM fallback), or `[class*="VideoPlayerSubtitles__text"]` (portrait/vertical clip fallback)
+- `suppressEvents: true`
+- Uses a standard `<video>` element — pause/play via the HTMLMediaElement API
+- **Four subtitle rendering paths** (handled in `check()` in priority order):
+  1. **Firefox TextTrack**: the browser renders native `.vtt-cue-teletext` DOM elements — no custom overlay needed, used directly as click targets
+  2. **Chrome TextTrack**: `track.mode = 'hidden'` suppresses native rendering; a custom `.vtt-cue-teletext` overlay is created from cue data and appended to `video.parentElement`
+  3. **Chrome React fallback** (some videos): subtitles appear as DOM elements inside `[data-rt="subtitles-container"]`. Detected via `[data-rt="subtitles-container"] div:has(> span)` and used directly as click targets
+  4. **Portrait/vertical clip fallback** (some videos): subtitles appear inside a `VideoPlayerSubtitles__root` overlay directly in the player (no TextTrack, no `data-rt` container). Detected via `[class*="VideoPlayerSubtitles__text"]` and used directly as click targets. Unlike paths 1–3, the aside-panel duplicate is NOT hidden because there is none — the `VideoPlayerSubtitles__root` element IS the primary subtitle renderer
+- **Aside-panel duplicate**: for landscape videos, the player also renders a `VideoPlayerSubtitles__container` React component in the page aside — hidden by setting `display: none` whenever paths 1–3 are active. The portrait path (path 4) never sets `originalSubtitleContainer`, so the portrait player's own container is never hidden — this is intentional: for portrait videos the `VideoPlayerSubtitles__root` IS the primary renderer (there is no aside duplicate)
+- `data-rt="subtitles-container"` is a stable `data-*` attribute (manually placed by the developers). The Emotion CSS-in-JS class names on its children (e.g. `css-1okjmlg`) are NOT used as selectors because they can change between player versions
+- CSS class names use CSS Modules with unstable hash suffixes (e.g. `VideoPlayerSubtitles__container___I3sgk`) — always use `[class*="VideoPlayerSubtitles__"]` prefix selectors, never the full generated class name
+- The `VideoPlayerSubtitles__container` may not exist in the DOM when `setup()` first runs (before any cue is active); the hide logic runs in `renderCues()` on every cue change so it catches the element whenever it appears
+- The player's document-level capture `click` handler swallows all click events (for play/pause toggling) — this is why tooltip and context menu item interactions use `mousedown` instead of `click`
 
 ## Overlay Handling
 
@@ -139,4 +167,5 @@ node --test test/*.test.js
 3. If the site uses a standard `<video>` element, call `makeVideoSiteConfig(selector)` and add the result to `SITE_CONFIGS` in `content.js`; otherwise write a custom config object with `subtitleSelector`, `suppressEvents`, and video control methods
 4. Add the hostname pattern to `content_scripts[0].matches` in both `manifest.firefox.json` and `manifest.chrome.json`
 5. If the site's subtitle elements have `pointer-events: none`, add a CSS override in `content.css`
-6. Test: single-click word translation, double-click sentence translation, hyphenated words, overlay handling
+6. If the site renders subtitles in multiple DOM locations simultaneously (player overlay + aside-panel duplicate, accessibility mirror, etc.), add each location's selector to the union in `subtitleSelector` — `segmentsForCaption` will automatically constrain all queries to the clicked element's path, so word and sentence highlighting will work correctly without any extra special-casing
+7. Test: single-click word translation, double-click sentence translation, hyphenated words, overlay handling

@@ -26,7 +26,8 @@
     {
       "matches": [
         "*://www.youtube.com/*",
-        "*://www.svtplay.se/*"
+        "*://www.svtplay.se/*",
+        "*://www.svt.se/*"
       ],
       "js": [
         "src/constants.js",
