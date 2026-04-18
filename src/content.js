@@ -34,6 +34,10 @@ browser.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes[STORAGE_KEY_SUBTITLE_FONT_SIZE]) {
         subtitleFontSize = changes[STORAGE_KEY_SUBTITLE_FONT_SIZE].newValue || DEFAULT_SUBTITLE_FONT_SIZE;
         if (subtitleOverlay) subtitleOverlay.setFontSize(subtitleFontSize);
+        for (const id of ["translatedWord", "translatedSentence"]) {
+            const el = document.getElementById(id);
+            if (el) el.style.fontSize = subtitleFontSize + "px";
+        }
     }
 });
 

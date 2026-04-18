@@ -9,6 +9,7 @@ const sourceSelect = document.getElementById("sourceLang");
 const targetSelect = document.getElementById("targetLang");
 const apiKeyInput = document.getElementById("apiKey");
 const subtitleFontSizeInput = document.getElementById("subtitleFontSize");
+const subtitleFontSizeValue = document.getElementById("subtitleFontSizeValue");
 const presetSwatches = document.querySelectorAll("#colorSwatches .color-swatch[data-color]");
 const customColorPreview = document.getElementById("customColorPreview");
 const hueSlider = document.getElementById("hueSlider");
@@ -109,7 +110,10 @@ browser.storage.local.get([
     if (data[STORAGE_KEY_SOURCE_LANG]) sourceSelect.value = data[STORAGE_KEY_SOURCE_LANG];
     if (data[STORAGE_KEY_TARGET_LANG]) targetSelect.value = data[STORAGE_KEY_TARGET_LANG];
     if (data[STORAGE_KEY_DEEPL_API_KEY]) apiKeyInput.value = data[STORAGE_KEY_DEEPL_API_KEY];
-    if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) subtitleFontSizeInput.value = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
+    if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) {
+        subtitleFontSizeInput.value = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
+        subtitleFontSizeValue.textContent = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
+    }
     renderColor(data[STORAGE_KEY_HIGHLIGHT_COLOR] || DEFAULT_HIGHLIGHT_COLOR);
     applyAdvancedSettings(data);
 });
@@ -123,10 +127,10 @@ targetSelect.addEventListener("change", () => {
     browser.storage.local.set({ [STORAGE_KEY_TARGET_LANG]: targetSelect.value });
 });
 
-subtitleFontSizeInput.addEventListener("change", () => {
-    browser.storage.local.set({
-        [STORAGE_KEY_SUBTITLE_FONT_SIZE]: parseInt(subtitleFontSizeInput.value, 10) || DEFAULT_SUBTITLE_FONT_SIZE
-    });
+subtitleFontSizeInput.addEventListener("input", () => {
+    const size = parseInt(subtitleFontSizeInput.value, 10) || DEFAULT_SUBTITLE_FONT_SIZE;
+    subtitleFontSizeValue.textContent = size;
+    browser.storage.local.set({ [STORAGE_KEY_SUBTITLE_FONT_SIZE]: size });
 });
 
 contextHistorySizeInput.addEventListener("change", () => {
