@@ -138,6 +138,12 @@ document.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
 
+    // Triple-click: translate all visible subtitle text.
+    if (event.detail === 3) {
+        handleTripleClick(event, cue);
+        return;
+    }
+
     // Skip the second click of a double-click; dblclick handler takes over.
     if (event.detail > 1) return;
 
@@ -312,6 +318,44 @@ async function handleDoubleClick(event, captionElement, caret) {
     showTooltip({
         wordTranslation: sentenceResult.translation,
         detectedSourceLang: sentenceResult.detectedSourceLang || null,
+        x: event.clientX,
+        y: event.clientY,
+        isSentence: true,
+        subtitleRect: captionElement.getBoundingClientRect(),
+    });
+}
+
+// Triple-click on a subtitle: translate all currently visible subtitle text.
+async function handleTripleClick(event, captionElement) {
+    const translationId = ++currentTranslationId;
+
+    dismissPrevious();
+
+    const segments = subtitleOverlay.getSegments();
+    // Use raw trimmed textContent joined with spaces — this matches what
+    // highlightSentenceAcrossSegments builds internally, so indexOf finds it at offset 0.
+    // getAllSubtitleText uses joinSubtitleParts (hyphen-collapsing) which would diverge.
+    const highlightText = segments.map(s => s.textContent.trim()).join(" ");
+    if (!highlightText) return;
+
+    lastHighlightedSegments = highlightSentenceAcrossSegments(segments, highlightText, document);
+    subtitleOverlay.freeze();
+
+    if (pauseOnTranslate) {
+        adapter.pauseVideo();
+        adapter.onResume(() => cleanup());
+    }
+
+    if (translationId !== currentTranslationId) return;
+
+    const translateText = getAllSubtitleText(segments);
+    const context = getSubtitleContext();
+    recordSubtitle(translateText);
+    const result = await browser.runtime.sendMessage({ action: "translate", text: translateText, context });
+    if (translationId !== currentTranslationId) return;
+    showTooltip({
+        wordTranslation: result.translation,
+        detectedSourceLang: result.detectedSourceLang || null,
         x: event.clientX,
         y: event.clientY,
         isSentence: true,

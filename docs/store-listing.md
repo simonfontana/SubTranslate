@@ -1,11 +1,12 @@
 # Store Listing Description
 
-**SubTranslate** helps you translate video subtitles instantly while you watch. Click any subtitle word to pause the video and see its translation in a tooltip. Double-click to translate the full sentence.
+**SubTranslate** helps you translate video subtitles instantly while you watch. Click any subtitle word to pause the video and see its translation in a tooltip. Double-click to translate the full sentence. Triple-click to translate all visible subtitles at once.
 
 **Features:**
 
 * Click individual subtitle words for instant translation
 * Double-click to translate the full sentence
+* Triple-click to translate all visible subtitles at once
 * Explore sentence translations with clickable words
 * Click translated words to see reverse translations back to the source language
 * Right-click subtitles to copy the text or look up a word on Wiktionary
@@ -28,3 +29,4 @@
 
 **Setup:**
 A DeepL API key is required. Get one from `deepl.com/your-account/keys`, then open the extension popup and enter your API key and preferred languages.
+

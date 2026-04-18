@@ -35,6 +35,7 @@ Both `highlightWordAcrossSegments()` and `highlightSentenceAcrossSegments()` use
 
 1. **Word view** (single-click): Shows the translated word in bold. Clicking it highlights the word (via `.highlight-reverse`) and shows a reverse translation popup above the tooltip (target -> source language). Right-click opens a custom context menu with "Copy".
 2. **Sentence view** (double-click): Each word in the translated sentence is rendered as a clickable `<span>`. Clicking any word highlights it and shows a reverse translation popup. Right-click opens a context menu with "Copy" / "Copy sentence".
+3. **All subtitles view** (triple-click): Highlights all visible subtitle segments and translates their joined text. Uses the same sentence-style tooltip as double-click.
 3. **Subtitle right-click** (without triggering a translation): Right-clicking a subtitle word shows a context menu with "Copy" (the right-clicked word), "Copy sentence" (the sentence containing that word), and "Look up on Wiktionary".
 
 **Implementation note**: Tooltip and context menu item interactions use `mousedown` rather than `click`. Some sites (notably svt.se) attach a document-level capture-phase `click` handler that calls `stopPropagation()`, preventing `click` listeners on our tooltip elements from firing. `mousedown` is not intercepted this way. This is a defensive pattern for our tooltip UI, not a site-specific hack.
