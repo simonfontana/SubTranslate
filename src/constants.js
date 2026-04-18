@@ -34,6 +34,7 @@ const STORAGE_KEY_SOURCE_LANG = "sourceLang";
 const STORAGE_KEY_TARGET_LANG = "targetLang";
 const STORAGE_KEY_DEEPL_API_KEY = "deeplApiKey";
 const STORAGE_KEY_SUBTITLE_FONT_SIZE = "subtitleFontSize";
+const STORAGE_KEY_SUBTITLE_POSITION = "subtitlePosition";
 const STORAGE_KEY_HIGHLIGHT_COLOR = "highlightColor";
 const STORAGE_KEY_CONTEXT_HISTORY_SIZE = "contextHistorySize";
 const STORAGE_KEY_DEEPL_MODEL_TYPE = "deeplModelType";
@@ -63,6 +64,9 @@ function getSiteIdFromHostname(hostname) {
     const info = SITE_INFO[hostname];
     return info ? info.id : null;
 }
+
+// Subtitle position (percentage from bottom)
+const DEFAULT_SUBTITLE_POSITION = 10;
 
 // Advanced translation defaults
 const DEFAULT_CONTEXT_HISTORY_SIZE = 5;

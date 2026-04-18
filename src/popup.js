@@ -10,6 +10,8 @@ const targetSelect = document.getElementById("targetLang");
 const apiKeyInput = document.getElementById("apiKey");
 const subtitleFontSizeInput = document.getElementById("subtitleFontSize");
 const subtitleFontSizeValue = document.getElementById("subtitleFontSizeValue");
+const subtitlePositionInput = document.getElementById("subtitlePosition");
+const subtitlePositionValue = document.getElementById("subtitlePositionValue");
 const presetSwatches = document.querySelectorAll("#colorSwatches .color-swatch[data-color]");
 const customColorPreview = document.getElementById("customColorPreview");
 const hueSlider = document.getElementById("hueSlider");
@@ -77,6 +79,7 @@ async function loadStorageData() {
         STORAGE_KEY_TARGET_LANG,
         STORAGE_KEY_DEEPL_API_KEY,
         STORAGE_KEY_SUBTITLE_FONT_SIZE,
+        STORAGE_KEY_SUBTITLE_POSITION,
         STORAGE_KEY_HIGHLIGHT_COLOR,
         STORAGE_KEY_CONTEXT_HISTORY_SIZE,
         STORAGE_KEY_DEEPL_MODEL_TYPE,
@@ -189,6 +192,10 @@ async function loadAllSettings() {
     subtitleFontSizeInput.value = fontSize;
     subtitleFontSizeValue.textContent = fontSize;
 
+    const position = effectiveValue(data, STORAGE_KEY_SUBTITLE_POSITION, DEFAULT_SUBTITLE_POSITION);
+    subtitlePositionInput.value = position;
+    subtitlePositionValue.textContent = position;
+
     renderColor(effectiveValue(data, STORAGE_KEY_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_COLOR));
 
     const historySize = effectiveValue(data, STORAGE_KEY_CONTEXT_HISTORY_SIZE, DEFAULT_CONTEXT_HISTORY_SIZE);
@@ -217,6 +224,12 @@ subtitleFontSizeInput.addEventListener("input", () => {
     saveSetting(STORAGE_KEY_SUBTITLE_FONT_SIZE, size);
 });
 
+subtitlePositionInput.addEventListener("input", () => {
+    const position = parseInt(subtitlePositionInput.value, 10);
+    subtitlePositionValue.textContent = position;
+    saveSetting(STORAGE_KEY_SUBTITLE_POSITION, position);
+});
+
 contextHistorySizeInput.addEventListener("input", () => {
     const size = parseInt(contextHistorySizeInput.value, 10);
     renderContextHistorySize(size);
@@ -237,6 +250,7 @@ resetGlobalBtn.addEventListener("click", async () => {
         [STORAGE_KEY_SOURCE_LANG]: "auto",
         [STORAGE_KEY_TARGET_LANG]: "EN",
         [STORAGE_KEY_SUBTITLE_FONT_SIZE]: DEFAULT_SUBTITLE_FONT_SIZE,
+        [STORAGE_KEY_SUBTITLE_POSITION]: DEFAULT_SUBTITLE_POSITION,
         [STORAGE_KEY_HIGHLIGHT_COLOR]: DEFAULT_HIGHLIGHT_COLOR,
         [STORAGE_KEY_CONTEXT_HISTORY_SIZE]: DEFAULT_CONTEXT_HISTORY_SIZE,
         [STORAGE_KEY_DEEPL_MODEL_TYPE]: DEFAULT_DEEPL_MODEL_TYPE,

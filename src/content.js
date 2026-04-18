@@ -27,6 +27,7 @@ const SUBTITLE_SELECTOR = '.subtranslate-cue';
 const contentSiteId = getSiteIdFromHostname(window.location.hostname);
 
 let subtitleFontSize = DEFAULT_SUBTITLE_FONT_SIZE;
+let subtitlePosition = DEFAULT_SUBTITLE_POSITION;
 let subtitleOverlay = null;
 
 // Apply the user's highlight color via CSS custom properties on <html>.
@@ -68,6 +69,10 @@ function applyAllSettings(allData) {
         if (el) el.style.fontSize = subtitleFontSize + "px";
     }
 
+    const position = getEffectiveSetting(allData, contentSiteId, STORAGE_KEY_SUBTITLE_POSITION, DEFAULT_SUBTITLE_POSITION);
+    subtitlePosition = position;
+    if (subtitleOverlay) subtitleOverlay.setPosition(subtitlePosition);
+
     applyHighlightColor(getEffectiveSetting(allData, contentSiteId, STORAGE_KEY_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_COLOR));
 
     const historySize = getEffectiveSetting(allData, contentSiteId, STORAGE_KEY_CONTEXT_HISTORY_SIZE, DEFAULT_CONTEXT_HISTORY_SIZE);
@@ -80,6 +85,7 @@ function applyAllSettings(allData) {
 // Initial load
 const CONTENT_STORAGE_KEYS = [
     STORAGE_KEY_SUBTITLE_FONT_SIZE,
+    STORAGE_KEY_SUBTITLE_POSITION,
     STORAGE_KEY_HIGHLIGHT_COLOR,
     STORAGE_KEY_CONTEXT_HISTORY_SIZE,
     STORAGE_KEY_PAUSE_ON_TRANSLATE,
@@ -545,6 +551,7 @@ function init() {
 
     subtitleOverlay = createSubtitleOverlay(anchor);
     subtitleOverlay.setFontSize(subtitleFontSize);
+    subtitleOverlay.setPosition(subtitlePosition);
 
     adapter.startObserving((cues) => {
         subtitleOverlay.updateCues(cues);

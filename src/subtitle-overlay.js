@@ -58,5 +58,8 @@ function createSubtitleOverlay(anchorElement) {
 
         // Update font size on the overlay container.
         setFontSize(px) { overlay.style.fontSize = px + 'px'; },
+
+        // Update vertical position (percentage from bottom).
+        setPosition(percent) { overlay.style.bottom = percent + '%'; },
     };
 }
