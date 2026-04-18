@@ -8,6 +8,7 @@
 - Video is paused when a translation is triggered (unless the user disables pause-on-translate in the Advanced settings tab)
 - `joinHyphenatedWord()` handles words split across subtitle lines (e.g. "komplett-" / "eringar" -> "kompletteringar"). It returns both a joined form (for translation) and the original hyphenated form (for highlighting).
 - Recent subtitle lines are recorded in a ring buffer (`createSubtitleHistory`) and sent as DeepL translation context for better word disambiguation. The buffer size is configurable in the Advanced settings tab (default 5, set to 0 to disable).
+- Settings changes (font size, highlight color, subtitle position) take effect immediately on open translation boxes and subtitles via the `storage.onChanged` handler — no need to dismiss and reopen.
 
 ## Overlay Freeze/Unfreeze
 
@@ -48,5 +49,5 @@ Since our overlay elements are the topmost clickable layer (high z-index, `point
 
 - `content.css` is loaded alongside `content.js` by the manifest
 - `.highlight-translate` and `.highlight-reverse` use CSS custom properties (`--subtranslate-highlight`, `--subtranslate-highlight-soft`) set on `<html>` by `applyHighlightColor()` in content.js
-- `.subtranslate-subtitle-overlay` positions the overlay inside the video player (`position: absolute; bottom: 10%`) with `pointer-events: none` on the container (clicks pass through to the player) and `pointer-events: auto` on `.subtranslate-cue` text spans
+- `.subtranslate-subtitle-overlay` positions the overlay inside the video player (`position: absolute; bottom: <subtitlePosition>%`) with `pointer-events: none` on the container (clicks pass through to the player) and `pointer-events: auto` on `.subtranslate-cue` text spans. The vertical position is configurable via the Appearance tab (0–95%, default 10%).
 - `.subtranslate-cue .highlight-translate` uses the semi-transparent highlight variant so highlighted text blends with the dark subtitle background

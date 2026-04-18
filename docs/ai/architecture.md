@@ -31,11 +31,13 @@ Five component layers communicate via `browser.runtime.sendMessage` (plus shared
 
 **background.js** — translation service layer:
 - Listens for `"translate"` messages from content.js
-- Fetches DeepL API key and language settings from `browser.storage.local`
+- Resolves DeepL API key and language settings from `browser.storage.local` via `getEffectiveSetting()`, respecting per-site overrides when the message includes a site ID
 - POSTs to the DeepL translate endpoint; supports a `reverse` flag that swaps source/target languages
 
 **popup.html + popup.js** — settings UI:
-- Three tabs: **General** (source/target language, DeepL API key), **Appearance** (subtitle font size, highlight color), **Advanced** (context history size, translation model, pause-on-translate toggle, reset-to-defaults button)
+- Three tabs: **General** (source/target language, DeepL API key), **Appearance** (subtitle font size, subtitle vertical position, highlight color), **Advanced** (context history size, translation model, pause-on-translate toggle, reset-to-defaults button)
+- **Per-site overrides**: scope tabs at the top let the user switch between Global and site-specific settings (YouTube, SVT Play, svt.se). Per-site overrides are stored under the `siteOverrides` storage key, keyed by site ID. When no override is set for a key, the global value is used as fallback. Resolution is handled by `getEffectiveSetting()` in `constants.js`.
+- `SITE_INFO` in `constants.js` maps hostnames to site IDs and labels, shared by the popup, content.js, and background.js
 - All settings auto-save on change; API key is validated against DeepL with an 800ms debounce
 - Settings persisted to `browser.storage.local`; all storage keys and defaults live in `src/constants.js`
 

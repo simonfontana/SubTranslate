@@ -20,6 +20,13 @@
        "www.example.com": createExampleAdapter,
    };
    ```
+   Also add the site to the `SITE_INFO` map in `src/constants.js` so per-site settings overrides and the popup scope tabs work:
+   ```js
+   const SITE_INFO = {
+       ...
+       "www.example.com": { id: "example", label: "Example" },
+   };
+   ```
 
 5. **Update both manifests** (`manifest.chrome.json` and `manifest.firefox.json`):
    - Add the hostname pattern to `content_scripts[0].matches`
