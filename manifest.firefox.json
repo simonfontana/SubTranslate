@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "SubTranslate",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "description": "Click a word in video subtitles to translate it using DeepL.",
   "permissions": [
     "activeTab",
