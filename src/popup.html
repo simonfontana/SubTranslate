@@ -7,7 +7,7 @@
         body {
             font-family: Arial, sans-serif;
             padding: 10px;
-            width: 220px;
+            width: 230px;
         }
 
         label {
@@ -270,9 +270,9 @@
     </div>
 
     <div id="tab-advanced" class="tab-panel">
-        <label for="contextHistorySize">Context history size:</label>
-        <input type="number" id="contextHistorySize" min="0" max="10" value="5" style="width: 100%;" />
-        <small>Previous subtitle lines sent to DeepL as context for better translations. Set to 0 to disable.</small>
+        <label for="contextHistorySize">Context history size: <span id="contextHistorySizeValue">5</span></label>
+        <input type="range" id="contextHistorySize" min="0" max="30" value="5" style="width: 100%; margin-top: 4px;" />
+        <small>Previous subtitles sent as context for better translations. Does not count towards character usage.</small>
 
         <label for="deeplModelType">Translation model:</label>
         <select id="deeplModelType">

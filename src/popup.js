@@ -16,6 +16,7 @@ const hueSlider = document.getElementById("hueSlider");
 const satSlider = document.getElementById("satSlider");
 const lightSlider = document.getElementById("lightSlider");
 const contextHistorySizeInput = document.getElementById("contextHistorySize");
+const contextHistorySizeValue = document.getElementById("contextHistorySizeValue");
 const deeplModelTypeSelect = document.getElementById("deeplModelType");
 const pauseOnTranslateCheckbox = document.getElementById("pauseOnTranslate");
 const resetAdvancedBtn = document.getElementById("resetAdvanced");
@@ -86,11 +87,17 @@ function commitColor(color, syncSliders = true) {
     renderColor(color, syncSliders);
 }
 
+function renderContextHistorySize(value) {
+    contextHistorySizeInput.value = value;
+    contextHistorySizeValue.textContent = value === 0 ? "disabled" : value;
+}
+
 // Restore previously saved settings into the form fields
 function applyAdvancedSettings(data) {
-    contextHistorySizeInput.value = typeof data[STORAGE_KEY_CONTEXT_HISTORY_SIZE] === "number"
+    const size = typeof data[STORAGE_KEY_CONTEXT_HISTORY_SIZE] === "number"
         ? data[STORAGE_KEY_CONTEXT_HISTORY_SIZE]
         : DEFAULT_CONTEXT_HISTORY_SIZE;
+    renderContextHistorySize(size);
     deeplModelTypeSelect.value = data[STORAGE_KEY_DEEPL_MODEL_TYPE] || DEFAULT_DEEPL_MODEL_TYPE;
     pauseOnTranslateCheckbox.checked = typeof data[STORAGE_KEY_PAUSE_ON_TRANSLATE] === "boolean"
         ? data[STORAGE_KEY_PAUSE_ON_TRANSLATE]
@@ -133,11 +140,10 @@ subtitleFontSizeInput.addEventListener("input", () => {
     browser.storage.local.set({ [STORAGE_KEY_SUBTITLE_FONT_SIZE]: size });
 });
 
-contextHistorySizeInput.addEventListener("change", () => {
-    const raw = parseInt(contextHistorySizeInput.value, 10);
-    const clamped = Math.max(0, Math.min(10, Number.isFinite(raw) ? raw : DEFAULT_CONTEXT_HISTORY_SIZE));
-    contextHistorySizeInput.value = clamped;
-    browser.storage.local.set({ [STORAGE_KEY_CONTEXT_HISTORY_SIZE]: clamped });
+contextHistorySizeInput.addEventListener("input", () => {
+    const size = parseInt(contextHistorySizeInput.value, 10);
+    renderContextHistorySize(size);
+    browser.storage.local.set({ [STORAGE_KEY_CONTEXT_HISTORY_SIZE]: size });
 });
 
 deeplModelTypeSelect.addEventListener("change", () => {
