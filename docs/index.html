@@ -135,9 +135,11 @@
     <header>
         <img src="../assets/icon512.png" alt="SubTranslate icon">
         <h1>SubTranslate</h1>
-        <p>Click any word in video subtitles to instantly translate it.</p>
+        <p>Translate video subtitles instantly while you watch. Click any subtitle word to pause and see its translation.</p>
         <div class="install-buttons">
-            <a class="btn-chrome" href="https://chromewebstore.google.com/detail/subtranslate/TODO">Chrome Web Store</a>
+            <a class="btn-chrome"
+                href="https://chromewebstore.google.com/detail/subtranslate/bcpgehmgmjjoeakgfjgdppjdjhogcbkj">Chrome Web
+                Store</a>
             <a class="btn-firefox" href="https://addons.mozilla.org/en-US/firefox/addon/subtranslate/">Firefox Add-ons</a>
         </div>
     </header>
@@ -147,8 +149,8 @@
             <h2>What is SubTranslate?</h2>
             <p>
                 SubTranslate is a lightweight browser extension that lets you translate words and sentences
-                directly from video subtitles. It works on <strong>YouTube</strong> and <strong>SVT Play</strong>,
-                powered by the <strong>DeepL API</strong>.
+                directly from video subtitles. It works on <strong>YouTube</strong>, <strong>SVT Play</strong>,
+                and <strong>svt.se</strong>, powered by the <strong>DeepL API</strong>.
             </p>
         </section>
 
@@ -158,27 +160,51 @@
                 <li>Play a video with subtitles enabled.</li>
                 <li><strong>Click</strong> a word in the subtitles — the video pauses and a translation tooltip appears.</li>
                 <li><strong>Double-click</strong> to translate the full sentence.</li>
+                <li><strong>Triple-click</strong> to translate all visible subtitles at once.</li>
                 <li>Click any word in the translated sentence for a <strong>reverse translation</strong> back to the source language.</li>
+                <li><strong>Right-click</strong> subtitles to copy the text or look up a word on Wiktionary.</li>
             </ol>
         </section>
 
         <section>
             <h2>Features</h2>
             <ul>
-                <li>Single-click word translation</li>
-                <li>Double-click full sentence translation</li>
-                <li>Reverse translation (click translated words)</li>
-                <li>Supports 29 languages via DeepL</li>
-                <li>Works on YouTube and SVT Play</li>
+                <li>Click individual subtitle words for instant translation</li>
+                <li>Double-click to translate the full sentence</li>
+                <li>Triple-click to translate all visible subtitles at once</li>
+                <li>Explore sentence translations with clickable words</li>
+                <li>Click translated words to see reverse translations back to the source language</li>
+                <li>Right-click subtitles to copy the text or look up a word on Wiktionary</li>
+                <li>Correctly handles hyphenated words split across subtitle lines</li>
+                <li>Automatically pauses playback during translation (configurable)</li>
+                <li>Tooltip closes when playback resumes</li>
+                <li>Works on YouTube, SVT Play, and svt.se</li>
+                <li>Supports all languages available through DeepL</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Appearance &amp; customization</h2>
+            <ul>
+                <li>Adjustable subtitle font size and vertical position</li>
+                <li>Customizable highlight color with presets and HSL color picker</li>
+                <li>Per-site settings overrides — configure each site independently</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Advanced options</h2>
+            <ul>
+                <li>Context history — include previous subtitles for more accurate translations</li>
+                <li>Choice of DeepL translation model (high quality or fast)</li>
             </ul>
         </section>
 
         <section>
             <h2>Setup</h2>
             <ol>
-                <li>Install the extension from the <a href="https://chromewebstore.google.com/detail/subtranslate/TODO">Chrome Web Store</a> or <a href="https://addons.mozilla.org/en-US/firefox/addon/subtranslate/">Firefox Add-ons</a>.</li>
-                <li>Click the SubTranslate icon in your browser toolbar.</li>
-                <li>Enter your <a href="https://www.deepl.com/en/your-account/keys">DeepL API key</a> (free tier works fine).</li>
+                <li>Install the extension from the <a href="https://chromewebstore.google.com/detail/subtranslate/bcpgehmgmjjoeakgfjgdppjdjhogcbkj">Chrome Web Store</a> or <a href="https://addons.mozilla.org/en-US/firefox/addon/subtranslate/">Firefox Add-ons</a>.</li>
+                <li>Open the extension popup and enter your <a href="https://www.deepl.com/your-account/keys">DeepL API key</a>.</li>
                 <li>Choose your source and target languages, then save.</li>
             </ol>
         </section>
