@@ -4,6 +4,7 @@
   "version": "1.7.1",
   "description": "Click a word in video subtitles to translate it using DeepL.",
   "permissions": [
+    "activeTab",
     "storage"
   ],
   "host_permissions": [

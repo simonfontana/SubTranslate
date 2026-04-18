@@ -38,6 +38,31 @@ const STORAGE_KEY_HIGHLIGHT_COLOR = "highlightColor";
 const STORAGE_KEY_CONTEXT_HISTORY_SIZE = "contextHistorySize";
 const STORAGE_KEY_DEEPL_MODEL_TYPE = "deeplModelType";
 const STORAGE_KEY_PAUSE_ON_TRANSLATE = "pauseOnTranslate";
+const STORAGE_KEY_SITE_OVERRIDES = "siteOverrides";
+
+// Hostname → site info mapping (used by popup, content.js, and background.js)
+const SITE_INFO = {
+    "www.youtube.com": { id: "youtube", label: "YouTube" },
+    "www.svtplay.se":  { id: "svtplay", label: "SVT Play" },
+    "www.svt.se":      { id: "svtse",   label: "svt.se" },
+};
+
+// Resolve the effective value of a setting, considering per-site overrides.
+// allData: the full storage object; siteId: e.g. "youtube" or null for global;
+// key: storage key; defaultValue: fallback if neither override nor global is set.
+function getEffectiveSetting(allData, siteId, key, defaultValue) {
+    if (siteId) {
+        const overrides = (allData[STORAGE_KEY_SITE_OVERRIDES] || {})[siteId] || {};
+        if (key in overrides) return overrides[key];
+    }
+    return key in allData ? allData[key] : defaultValue;
+}
+
+// Look up the site ID for a hostname (returns null if not a supported site).
+function getSiteIdFromHostname(hostname) {
+    const info = SITE_INFO[hostname];
+    return info ? info.id : null;
+}
 
 // Advanced translation defaults
 const DEFAULT_CONTEXT_HISTORY_SIZE = 5;

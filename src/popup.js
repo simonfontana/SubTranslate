@@ -3,7 +3,7 @@ const browser = globalThis.browser ?? globalThis.chrome;
 
 // Popup settings UI — lets the user configure source/target language and DeepL API key.
 // Settings are persisted in browser.storage.local and read by background.js on each
-// translation request.
+// translation request. Supports per-site overrides via the scope tabs.
 
 const sourceSelect = document.getElementById("sourceLang");
 const targetSelect = document.getElementById("targetLang");
@@ -19,9 +19,92 @@ const contextHistorySizeInput = document.getElementById("contextHistorySize");
 const contextHistorySizeValue = document.getElementById("contextHistorySizeValue");
 const deeplModelTypeSelect = document.getElementById("deeplModelType");
 const pauseOnTranslateCheckbox = document.getElementById("pauseOnTranslate");
-const resetAdvancedBtn = document.getElementById("resetAdvanced");
+const resetGlobalBtn = document.getElementById("resetGlobalBtn");
+const resetSiteBtn = document.getElementById("resetSiteBtn");
 const statusMsg = document.getElementById("statusMsg");
+const scopeTabs = document.getElementById("scopeTabs");
 
+// ---------------------------------------------------------------------------
+// Scope management — "global" or a site ID like "youtube"
+// ---------------------------------------------------------------------------
+let currentScope = "global";
+let currentSiteId = null; // set when on a supported site
+
+// Detect the active tab's site and inject the scope tab button if supported.
+async function detectCurrentSite() {
+    try {
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tabs.length === 0 || !tabs[0].url) return;
+        const url = new URL(tabs[0].url);
+        const info = SITE_INFO[url.hostname];
+        if (!info) return;
+        currentSiteId = info.id;
+        const btn = document.createElement("button");
+        btn.className = "scope-btn";
+        btn.dataset.scope = info.id;
+        btn.textContent = info.label;
+        scopeTabs.appendChild(btn);
+    } catch (e) {
+        // No tabs permission or unsupported page — global-only mode
+    }
+}
+
+// Switch scope and reload all field values
+function setScope(scope) {
+    currentScope = scope;
+    scopeTabs.querySelectorAll(".scope-btn").forEach(b =>
+        b.classList.toggle("active", b.dataset.scope === scope)
+    );
+    resetGlobalBtn.style.display = scope === "global" ? "block" : "none";
+    resetSiteBtn.style.display = scope !== "global" ? "block" : "none";
+    loadAllSettings();
+}
+
+// Scope tab click handler (delegated)
+scopeTabs.addEventListener("click", (e) => {
+    const btn = e.target.closest(".scope-btn");
+    if (btn) setScope(btn.dataset.scope);
+});
+
+// ---------------------------------------------------------------------------
+// Storage helpers — read/write respecting the current scope
+// ---------------------------------------------------------------------------
+
+// Load all stored data (global + overrides) from storage.
+async function loadStorageData() {
+    return browser.storage.local.get([
+        STORAGE_KEY_SOURCE_LANG,
+        STORAGE_KEY_TARGET_LANG,
+        STORAGE_KEY_DEEPL_API_KEY,
+        STORAGE_KEY_SUBTITLE_FONT_SIZE,
+        STORAGE_KEY_HIGHLIGHT_COLOR,
+        STORAGE_KEY_CONTEXT_HISTORY_SIZE,
+        STORAGE_KEY_DEEPL_MODEL_TYPE,
+        STORAGE_KEY_PAUSE_ON_TRANSLATE,
+        STORAGE_KEY_SITE_OVERRIDES,
+    ]);
+}
+
+// Get the effective value for a key in the current scope.
+function effectiveValue(allData, key, defaultValue) {
+    return getEffectiveSetting(allData, currentScope === "global" ? null : currentScope, key, defaultValue);
+}
+
+// Save a single key=value for the current scope.
+async function saveSetting(key, value) {
+    if (currentScope === "global") {
+        return browser.storage.local.set({ [key]: value });
+    }
+    const { [STORAGE_KEY_SITE_OVERRIDES]: overrides = {} } = await browser.storage.local.get(STORAGE_KEY_SITE_OVERRIDES);
+    const siteConfig = overrides[currentScope] || {};
+    siteConfig[key] = value;
+    overrides[currentScope] = siteConfig;
+    return browser.storage.local.set({ [STORAGE_KEY_SITE_OVERRIDES]: overrides });
+}
+
+// ---------------------------------------------------------------------------
+// Color helpers (unchanged)
+// ---------------------------------------------------------------------------
 function hslToHex(h, s, l) {
     s /= 100;
     l /= 100;
@@ -83,7 +166,7 @@ function renderColor(color, syncSliders = true) {
 }
 
 function commitColor(color, syncSliders = true) {
-    browser.storage.local.set({ [STORAGE_KEY_HIGHLIGHT_COLOR]: color });
+    saveSetting(STORAGE_KEY_HIGHLIGHT_COLOR, color);
     renderColor(color, syncSliders);
 }
 
@@ -92,83 +175,85 @@ function renderContextHistorySize(value) {
     contextHistorySizeValue.textContent = value === 0 ? "disabled" : value;
 }
 
-// Restore previously saved settings into the form fields
-function applyAdvancedSettings(data) {
-    const size = typeof data[STORAGE_KEY_CONTEXT_HISTORY_SIZE] === "number"
-        ? data[STORAGE_KEY_CONTEXT_HISTORY_SIZE]
-        : DEFAULT_CONTEXT_HISTORY_SIZE;
-    renderContextHistorySize(size);
-    deeplModelTypeSelect.value = data[STORAGE_KEY_DEEPL_MODEL_TYPE] || DEFAULT_DEEPL_MODEL_TYPE;
-    pauseOnTranslateCheckbox.checked = typeof data[STORAGE_KEY_PAUSE_ON_TRANSLATE] === "boolean"
-        ? data[STORAGE_KEY_PAUSE_ON_TRANSLATE]
-        : DEFAULT_PAUSE_ON_TRANSLATE;
+// ---------------------------------------------------------------------------
+// Load all settings into the form for the current scope
+// ---------------------------------------------------------------------------
+async function loadAllSettings() {
+    const data = await loadStorageData();
+
+    sourceSelect.value = effectiveValue(data, STORAGE_KEY_SOURCE_LANG, "auto");
+    targetSelect.value = effectiveValue(data, STORAGE_KEY_TARGET_LANG, "EN");
+    apiKeyInput.value = effectiveValue(data, STORAGE_KEY_DEEPL_API_KEY, "") || "";
+
+    const fontSize = effectiveValue(data, STORAGE_KEY_SUBTITLE_FONT_SIZE, DEFAULT_SUBTITLE_FONT_SIZE);
+    subtitleFontSizeInput.value = fontSize;
+    subtitleFontSizeValue.textContent = fontSize;
+
+    renderColor(effectiveValue(data, STORAGE_KEY_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_COLOR));
+
+    const historySize = effectiveValue(data, STORAGE_KEY_CONTEXT_HISTORY_SIZE, DEFAULT_CONTEXT_HISTORY_SIZE);
+    renderContextHistorySize(typeof historySize === "number" ? historySize : DEFAULT_CONTEXT_HISTORY_SIZE);
+
+    deeplModelTypeSelect.value = effectiveValue(data, STORAGE_KEY_DEEPL_MODEL_TYPE, DEFAULT_DEEPL_MODEL_TYPE);
+
+    const pause = effectiveValue(data, STORAGE_KEY_PAUSE_ON_TRANSLATE, DEFAULT_PAUSE_ON_TRANSLATE);
+    pauseOnTranslateCheckbox.checked = typeof pause === "boolean" ? pause : DEFAULT_PAUSE_ON_TRANSLATE;
 }
 
-browser.storage.local.get([
-    STORAGE_KEY_SOURCE_LANG,
-    STORAGE_KEY_TARGET_LANG,
-    STORAGE_KEY_DEEPL_API_KEY,
-    STORAGE_KEY_SUBTITLE_FONT_SIZE,
-    STORAGE_KEY_HIGHLIGHT_COLOR,
-    STORAGE_KEY_CONTEXT_HISTORY_SIZE,
-    STORAGE_KEY_DEEPL_MODEL_TYPE,
-    STORAGE_KEY_PAUSE_ON_TRANSLATE,
-]).then(data => {
-    if (data[STORAGE_KEY_SOURCE_LANG]) sourceSelect.value = data[STORAGE_KEY_SOURCE_LANG];
-    if (data[STORAGE_KEY_TARGET_LANG]) targetSelect.value = data[STORAGE_KEY_TARGET_LANG];
-    if (data[STORAGE_KEY_DEEPL_API_KEY]) apiKeyInput.value = data[STORAGE_KEY_DEEPL_API_KEY];
-    if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) {
-        subtitleFontSizeInput.value = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
-        subtitleFontSizeValue.textContent = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
-    }
-    renderColor(data[STORAGE_KEY_HIGHLIGHT_COLOR] || DEFAULT_HIGHLIGHT_COLOR);
-    applyAdvancedSettings(data);
-});
-
-// Auto-save language and font size settings immediately on change
+// ---------------------------------------------------------------------------
+// Event handlers — auto-save on change, respecting current scope
+// ---------------------------------------------------------------------------
 sourceSelect.addEventListener("change", () => {
-    browser.storage.local.set({ [STORAGE_KEY_SOURCE_LANG]: sourceSelect.value });
+    saveSetting(STORAGE_KEY_SOURCE_LANG, sourceSelect.value);
 });
 
 targetSelect.addEventListener("change", () => {
-    browser.storage.local.set({ [STORAGE_KEY_TARGET_LANG]: targetSelect.value });
+    saveSetting(STORAGE_KEY_TARGET_LANG, targetSelect.value);
 });
 
 subtitleFontSizeInput.addEventListener("input", () => {
     const size = parseInt(subtitleFontSizeInput.value, 10) || DEFAULT_SUBTITLE_FONT_SIZE;
     subtitleFontSizeValue.textContent = size;
-    browser.storage.local.set({ [STORAGE_KEY_SUBTITLE_FONT_SIZE]: size });
+    saveSetting(STORAGE_KEY_SUBTITLE_FONT_SIZE, size);
 });
 
 contextHistorySizeInput.addEventListener("input", () => {
     const size = parseInt(contextHistorySizeInput.value, 10);
     renderContextHistorySize(size);
-    browser.storage.local.set({ [STORAGE_KEY_CONTEXT_HISTORY_SIZE]: size });
+    saveSetting(STORAGE_KEY_CONTEXT_HISTORY_SIZE, size);
 });
 
 deeplModelTypeSelect.addEventListener("change", () => {
-    browser.storage.local.set({ [STORAGE_KEY_DEEPL_MODEL_TYPE]: deeplModelTypeSelect.value });
+    saveSetting(STORAGE_KEY_DEEPL_MODEL_TYPE, deeplModelTypeSelect.value);
 });
 
 pauseOnTranslateCheckbox.addEventListener("change", () => {
-    browser.storage.local.set({ [STORAGE_KEY_PAUSE_ON_TRANSLATE]: pauseOnTranslateCheckbox.checked });
+    saveSetting(STORAGE_KEY_PAUSE_ON_TRANSLATE, pauseOnTranslateCheckbox.checked);
 });
 
-// Reset the Advanced tab to defaults. Other tabs (language, API key, appearance)
-// are left alone — resetting the API key would be a user-hostile surprise.
-resetAdvancedBtn.addEventListener("click", () => {
-    const defaults = {
+// Reset all global settings to their defaults (does not touch API key or site overrides).
+resetGlobalBtn.addEventListener("click", async () => {
+    await browser.storage.local.set({
+        [STORAGE_KEY_SOURCE_LANG]: "auto",
+        [STORAGE_KEY_TARGET_LANG]: "EN",
+        [STORAGE_KEY_SUBTITLE_FONT_SIZE]: DEFAULT_SUBTITLE_FONT_SIZE,
+        [STORAGE_KEY_HIGHLIGHT_COLOR]: DEFAULT_HIGHLIGHT_COLOR,
         [STORAGE_KEY_CONTEXT_HISTORY_SIZE]: DEFAULT_CONTEXT_HISTORY_SIZE,
         [STORAGE_KEY_DEEPL_MODEL_TYPE]: DEFAULT_DEEPL_MODEL_TYPE,
         [STORAGE_KEY_PAUSE_ON_TRANSLATE]: DEFAULT_PAUSE_ON_TRANSLATE,
-    };
-    browser.storage.local.set(defaults);
-    applyAdvancedSettings(defaults);
+    });
+    loadAllSettings();
 });
 
-// We avoid <input type="color"> entirely: its OS/browser dialog steals focus,
-// which closes the extension popup on Chrome-on-Linux and Firefox before the
-// selection can be saved. Presets + in-popup HSL sliders stay inside the popup.
+// Reset all site-specific overrides back to global.
+resetSiteBtn.addEventListener("click", async () => {
+    const { [STORAGE_KEY_SITE_OVERRIDES]: overrides = {} } = await browser.storage.local.get(STORAGE_KEY_SITE_OVERRIDES);
+    delete overrides[currentScope];
+    await browser.storage.local.set({ [STORAGE_KEY_SITE_OVERRIDES]: overrides });
+    loadAllSettings();
+});
+
+// Color swatches
 presetSwatches.forEach(btn => {
     btn.addEventListener("click", () => commitColor(btn.dataset.color));
 });
@@ -205,7 +290,7 @@ apiKeyInput.addEventListener("input", () => {
             statusMsg.style.color = "red";
             return;
         }
-        await browser.storage.local.set({ [STORAGE_KEY_DEEPL_API_KEY]: key });
+        await saveSetting(STORAGE_KEY_DEEPL_API_KEY, key);
         statusMsg.textContent = "API key saved.";
         statusMsg.style.color = "green";
         setTimeout(() => { statusMsg.textContent = ""; }, 2000);
@@ -213,8 +298,6 @@ apiKeyInput.addEventListener("input", () => {
 });
 
 // Validate the API key by making a real translation request to DeepL.
-// If the key is valid, DeepL returns a translations array; an invalid key
-// returns a 403 error and no translations field.
 async function validateApiKey(key) {
     const url = `${getDeeplBaseUrl(key)}/v2/translate`;
     const params = new URLSearchParams();
@@ -244,18 +327,19 @@ async function validateApiKey(key) {
 const usageFooter = document.getElementById("usageFooter");
 
 async function fetchUsage() {
-    const { [STORAGE_KEY_DEEPL_API_KEY]: apiKey } = await browser.storage.local.get(STORAGE_KEY_DEEPL_API_KEY);
+    const data = await loadStorageData();
+    const apiKey = effectiveValue(data, STORAGE_KEY_DEEPL_API_KEY, null);
     if (!apiKey) return;
 
     try {
         const res = await fetch(`${getDeeplBaseUrl(apiKey)}/v2/usage`, {
             headers: { "Authorization": `DeepL-Auth-Key ${apiKey}` }
         });
-        const data = await res.json();
-        if (data.character_count != null && data.character_limit != null) {
-            const used = data.character_count.toLocaleString();
-            const total = data.character_limit.toLocaleString();
-            const percent = Math.min(100, (data.character_count / data.character_limit) * 100);
+        const result = await res.json();
+        if (result.character_count != null && result.character_limit != null) {
+            const used = result.character_count.toLocaleString();
+            const total = result.character_limit.toLocaleString();
+            const percent = Math.min(100, (result.character_count / result.character_limit) * 100);
             const barFill = document.getElementById("usageBarFill");
             barFill.style.width = `${percent}%`;
             barFill.style.background = percent >= 90 ? "#d93025" : percent >= 75 ? "#f9ab00" : "#1a73e8";
@@ -268,9 +352,7 @@ async function fetchUsage() {
     }
 }
 
-fetchUsage();
-
-// Tab switching
+// Tab switching (category tabs)
 document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
         document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -280,4 +362,11 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     });
 });
 
-
+// ---------------------------------------------------------------------------
+// Initialization
+// ---------------------------------------------------------------------------
+(async () => {
+    await detectCurrentSite();
+    await loadAllSettings();
+    fetchUsage();
+})();

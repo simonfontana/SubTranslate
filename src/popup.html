@@ -21,6 +21,30 @@
             margin-top: 4px;
         }
 
+        .scope-tabs {
+            display: flex;
+            border-bottom: 2px solid #999;
+            margin-bottom: 0;
+        }
+
+        .scope-btn {
+            flex: 1;
+            padding: 6px 0;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .scope-btn.active {
+            border-bottom-color: #1a73e8;
+            color: #1a73e8;
+        }
+
         .tabs {
             display: flex;
             border-bottom: 2px solid #ccc;
@@ -51,6 +75,17 @@
 
         .tab-panel.active {
             display: block;
+        }
+
+        #resetGlobalBtn,
+        #resetSiteBtn {
+            margin-top: 14px;
+            width: 100%;
+            padding: 6px;
+        }
+
+        #resetSiteBtn {
+            display: none;
         }
 
         #colorSwatches {
@@ -156,6 +191,11 @@
 </head>
 
 <body>
+    <div class="scope-tabs" id="scopeTabs">
+        <button class="scope-btn active" data-scope="global">Global</button>
+        <!-- Site-specific button injected by popup.js when on a supported site -->
+    </div>
+
     <div class="tabs">
         <button class="tab-btn active" data-tab="general">General</button>
         <button class="tab-btn" data-tab="appearance">Appearance</button>
@@ -285,8 +325,10 @@
             <input type="checkbox" id="pauseOnTranslate" /> Pause video on translate
         </label>
 
-        <button type="button" id="resetAdvanced" style="margin-top: 14px; width: 100%; padding: 6px;">Reset to defaults</button>
     </div>
+
+    <button type="button" id="resetGlobalBtn" style="margin-top: 14px; width: 100%; padding: 6px;">Reset to default configuration</button>
+    <button type="button" id="resetSiteBtn">Reset to global configuration</button>
 
     <p id="statusMsg" style="font-size: 12px; color: green; margin-top: 6px;"></p>
 

@@ -22,24 +22,12 @@ const SUBTITLE_SELECTOR = '.subtranslate-cue';
 
 // ---------------------------------------------------------------------------
 // Settings: font size, highlight color, subtitle history, pause-on-translate
+// All settings are resolved per-site (site override → global → default).
 // ---------------------------------------------------------------------------
+const contentSiteId = getSiteIdFromHostname(window.location.hostname);
+
 let subtitleFontSize = DEFAULT_SUBTITLE_FONT_SIZE;
 let subtitleOverlay = null;
-
-browser.storage.local.get(STORAGE_KEY_SUBTITLE_FONT_SIZE).then(data => {
-    if (data[STORAGE_KEY_SUBTITLE_FONT_SIZE]) subtitleFontSize = data[STORAGE_KEY_SUBTITLE_FONT_SIZE];
-    if (subtitleOverlay) subtitleOverlay.setFontSize(subtitleFontSize);
-});
-browser.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes[STORAGE_KEY_SUBTITLE_FONT_SIZE]) {
-        subtitleFontSize = changes[STORAGE_KEY_SUBTITLE_FONT_SIZE].newValue || DEFAULT_SUBTITLE_FONT_SIZE;
-        if (subtitleOverlay) subtitleOverlay.setFontSize(subtitleFontSize);
-        for (const id of ["translatedWord", "translatedSentence"]) {
-            const el = document.getElementById(id);
-            if (el) el.style.fontSize = subtitleFontSize + "px";
-        }
-    }
-});
 
 // Apply the user's highlight color via CSS custom properties on <html>.
 // Two variables are set: a solid color and a 40%-alpha variant used by the
@@ -54,15 +42,6 @@ function applyHighlightColor(hex) {
     root.style.setProperty("--subtranslate-highlight-soft", `rgba(${r}, ${g}, ${b}, 0.4)`);
 }
 
-browser.storage.local.get(STORAGE_KEY_HIGHLIGHT_COLOR).then(data => {
-    applyHighlightColor(data[STORAGE_KEY_HIGHLIGHT_COLOR] || DEFAULT_HIGHLIGHT_COLOR);
-});
-browser.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes[STORAGE_KEY_HIGHLIGHT_COLOR]) {
-        applyHighlightColor(changes[STORAGE_KEY_HIGHLIGHT_COLOR].newValue || DEFAULT_HIGHLIGHT_COLOR);
-    }
-});
-
 // Monotonically increasing ID used to discard stale translation responses.
 // Each new click/dblclick bumps this; when the async response arrives, it's
 // compared against currentTranslationId — if they differ, the result is outdated.
@@ -76,29 +55,44 @@ let subtitleHistory = createSubtitleHistory(DEFAULT_CONTEXT_HISTORY_SIZE);
 const recordSubtitle = (text) => subtitleHistory.record(text);
 const getSubtitleContext = () => subtitleHistory.getContext();
 
-browser.storage.local.get(STORAGE_KEY_CONTEXT_HISTORY_SIZE).then(data => {
-    const size = data[STORAGE_KEY_CONTEXT_HISTORY_SIZE];
-    if (typeof size === "number") subtitleHistory = createSubtitleHistory(size);
-});
-browser.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes[STORAGE_KEY_CONTEXT_HISTORY_SIZE]) {
-        const size = changes[STORAGE_KEY_CONTEXT_HISTORY_SIZE].newValue;
-        subtitleHistory = createSubtitleHistory(typeof size === "number" ? size : DEFAULT_CONTEXT_HISTORY_SIZE);
-    }
-});
-
 // Pause-on-translate toggle: cached locally so click handlers can read it synchronously.
 let pauseOnTranslate = DEFAULT_PAUSE_ON_TRANSLATE;
-browser.storage.local.get(STORAGE_KEY_PAUSE_ON_TRANSLATE).then(data => {
-    if (typeof data[STORAGE_KEY_PAUSE_ON_TRANSLATE] === "boolean") {
-        pauseOnTranslate = data[STORAGE_KEY_PAUSE_ON_TRANSLATE];
+
+// Load all site-aware settings from storage and apply them.
+function applyAllSettings(allData) {
+    const fontSize = getEffectiveSetting(allData, contentSiteId, STORAGE_KEY_SUBTITLE_FONT_SIZE, DEFAULT_SUBTITLE_FONT_SIZE);
+    subtitleFontSize = fontSize;
+    if (subtitleOverlay) subtitleOverlay.setFontSize(subtitleFontSize);
+    for (const id of ["translatedWord", "translatedSentence"]) {
+        const el = document.getElementById(id);
+        if (el) el.style.fontSize = subtitleFontSize + "px";
     }
-});
+
+    applyHighlightColor(getEffectiveSetting(allData, contentSiteId, STORAGE_KEY_HIGHLIGHT_COLOR, DEFAULT_HIGHLIGHT_COLOR));
+
+    const historySize = getEffectiveSetting(allData, contentSiteId, STORAGE_KEY_CONTEXT_HISTORY_SIZE, DEFAULT_CONTEXT_HISTORY_SIZE);
+    subtitleHistory = createSubtitleHistory(typeof historySize === "number" ? historySize : DEFAULT_CONTEXT_HISTORY_SIZE);
+
+    const pause = getEffectiveSetting(allData, contentSiteId, STORAGE_KEY_PAUSE_ON_TRANSLATE, DEFAULT_PAUSE_ON_TRANSLATE);
+    pauseOnTranslate = typeof pause === "boolean" ? pause : DEFAULT_PAUSE_ON_TRANSLATE;
+}
+
+// Initial load
+const CONTENT_STORAGE_KEYS = [
+    STORAGE_KEY_SUBTITLE_FONT_SIZE,
+    STORAGE_KEY_HIGHLIGHT_COLOR,
+    STORAGE_KEY_CONTEXT_HISTORY_SIZE,
+    STORAGE_KEY_PAUSE_ON_TRANSLATE,
+    STORAGE_KEY_SITE_OVERRIDES,
+];
+browser.storage.local.get(CONTENT_STORAGE_KEYS).then(applyAllSettings);
+
+// Re-apply when any relevant key (including siteOverrides) changes.
 browser.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes[STORAGE_KEY_PAUSE_ON_TRANSLATE]) {
-        const v = changes[STORAGE_KEY_PAUSE_ON_TRANSLATE].newValue;
-        pauseOnTranslate = typeof v === "boolean" ? v : DEFAULT_PAUSE_ON_TRANSLATE;
-    }
+    if (area !== "local") return;
+    const relevant = CONTENT_STORAGE_KEYS.some(k => k in changes);
+    if (!relevant) return;
+    browser.storage.local.get(CONTENT_STORAGE_KEYS).then(applyAllSettings);
 });
 
 // Stores { el, savedNodes } for each segment that was modified by highlighting,

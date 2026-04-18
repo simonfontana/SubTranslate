@@ -17,7 +17,13 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const reverse = request.reverse || false;
         const detectedSourceLang = request.detectedSourceLang || null;
         const context = request.context || null;
-        translateWithDeepL(request.text, reverse, detectedSourceLang, context)
+        // Derive site ID from the sender tab's URL for per-site settings
+        let siteId = null;
+        try {
+            const hostname = new URL(sender.tab.url).hostname;
+            siteId = getSiteIdFromHostname(hostname);
+        } catch (e) { /* no tab URL available — use global */ }
+        translateWithDeepL(request.text, reverse, detectedSourceLang, context, siteId)
             .then(result => {
                 console.log(`[DEBUG] Translation successful. Response: "${result.text}"`);
                 sendResponse({ translation: result.text, detectedSourceLang: result.detectedSourceLang });
@@ -37,15 +43,20 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // When source language is "auto", the source_lang param is omitted entirely so
 // DeepL auto-detects it. For reverse translations with auto-detect, `detectedSourceLang`
 // (from a prior forward translation's detected_source_language) is used as target_lang.
-async function translateWithDeepL(text, reverse = false, detectedSourceLang = null, context = null) {
-    const settings = await browser.storage.local.get([
+async function translateWithDeepL(text, reverse = false, detectedSourceLang = null, context = null, siteId = null) {
+    const allData = await browser.storage.local.get([
         STORAGE_KEY_SOURCE_LANG,
         STORAGE_KEY_TARGET_LANG,
         STORAGE_KEY_DEEPL_API_KEY,
         STORAGE_KEY_DEEPL_MODEL_TYPE,
+        STORAGE_KEY_SITE_OVERRIDES,
     ]);
 
-    const apiKey = settings[STORAGE_KEY_DEEPL_API_KEY];
+    const settings = {
+        sourceLang: getEffectiveSetting(allData, siteId, STORAGE_KEY_SOURCE_LANG, "auto"),
+        targetLang: getEffectiveSetting(allData, siteId, STORAGE_KEY_TARGET_LANG, "EN"),
+    };
+    const apiKey = getEffectiveSetting(allData, siteId, STORAGE_KEY_DEEPL_API_KEY, null);
     if (!apiKey) {
         console.error("[DEBUG] No DeepL API key set");
         return { text: "Please enter your DeepL API key in the extension popup." };
@@ -55,8 +66,9 @@ async function translateWithDeepL(text, reverse = false, detectedSourceLang = nu
 
     const url = `${getDeeplBaseUrl(apiKey)}/v2/translate`;
 
+    const modelType = getEffectiveSetting(allData, siteId, STORAGE_KEY_DEEPL_MODEL_TYPE, DEFAULT_DEEPL_MODEL_TYPE);
     const params = buildTranslateParams(text, { sourceLang, targetLang }, context, {
-        modelType: settings[STORAGE_KEY_DEEPL_MODEL_TYPE] || DEFAULT_DEEPL_MODEL_TYPE,
+        modelType,
     });
     console.log("[DEBUG] DeepL request params:", params);
 
